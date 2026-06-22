@@ -2,168 +2,238 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Olympus Hub v17.1 — Safe Boot Engine</title>
+<title>Olympus Chess Hub v22 — Hybrid Core</title>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  width: 100%;
-  height: 100%;
-  background: #000;
-  font-family: system-ui;
+html,body{
+  margin:0;
+  padding:0;
+  height:100%;
+  font-family:system-ui;
+  overflow:hidden;
+  background: radial-gradient(circle at top, #0a1a3a, #000);
+  color:white;
 }
 
-canvas {
-  display: block;
-  width: 100vw;
-  height: 100vh;
+.background{
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:url("https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=1600&q=80");
+  background-size:cover;
+  opacity:0.25;
+  filter:blur(2px);
 }
 
-#ui {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: rgba(0,0,0,0.85);
-  color: white;
-  padding: 12px;
-  width: 260px;
-  border: 1px solid #444;
-  font-size: 12px;
-  z-index: 10;
+.center{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:360px;
+  background:rgba(0,0,40,0.75);
+  border:1px solid rgba(255,255,255,0.15);
+  padding:20px;
+  backdrop-filter: blur(10px);
+}
+
+h1{text-align:center;font-weight:300;letter-spacing:2px;}
+
+input{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+  border:none;
+  outline:none;
+  background:rgba(255,255,255,0.08);
+  color:white;
+}
+
+button{
+  width:100%;
+  margin-top:10px;
+  padding:10px;
+  border:none;
+  background:#1a73ff;
+  color:white;
+  cursor:pointer;
+}
+
+button:hover{background:#4aa3ff;}
+
+.small{
+  font-size:11px;
+  opacity:0.7;
+  text-align:center;
+  margin-top:8px;
+  cursor:pointer;
+}
+
+.screen{display:none;}
+.active{display:block;}
+
+.email-card{
+  background:rgba(0,0,60,0.9);
+  border:1px solid rgba(255,255,255,0.2);
+  padding:20px;
+  margin-top:10px;
+  font-size:12px;
+  white-space:pre-wrap;
 }
 </style>
 </head>
 
 <body>
 
-<div id="ui">
-  <b>OLYMPUS v17.1 SAFE</b><br/>
-  STATE: <span id="state">BOOTING</span>
+<div class="background"></div>
+
+<div class="center">
+
+<!-- LOGIN -->
+<div id="loginScreen" class="screen active">
+  <h1>OLYMPUS CHESS</h1>
+  <input id="email" placeholder="Email"/>
+  <input id="password" type="password" placeholder="Password"/>
+  <button onclick="login()">LOGIN</button>
+  <div class="small" onclick="switchScreen('registerScreen')">Create Account</div>
+  <div class="small" onclick="switchScreen('resetScreen')">Forgot Password</div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+<!-- REGISTER -->
+<div id="registerScreen" class="screen">
+  <h1>CREATE ACCOUNT</h1>
+  <input id="name" placeholder="Name"/>
+  <input id="regEmail" placeholder="Email"/>
+  <input id="regPass" type="password" placeholder="Password"/>
+  <button onclick="register()">CREATE</button>
+  <div class="small" onclick="switchScreen('loginScreen')">Back</div>
+</div>
+
+<!-- RESET -->
+<div id="resetScreen" class="screen">
+  <h1>RESET PASSWORD</h1>
+  <input id="resetEmail" placeholder="Email"/>
+  <button onclick="resetPassword()">SEND</button>
+  <div class="small" onclick="switchScreen('loginScreen')">Back</div>
+</div>
+
+<!-- WELCOME -->
+<div id="welcomeScreen" class="screen">
+  <h1>WELCOME</h1>
+  <div id="emailBox" class="email-card"></div>
+  <button onclick="switchScreen('loginScreen')">BACK</button>
+</div>
+
+</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
+/* ---------------- FIREBASE INIT ---------------- */
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  appId: "YOUR_APP_ID"
+};
 
-let scene, camera, renderer, controls;
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-const CENTER = new THREE.Vector3(3.5, 0, 3.5);
+/* ---------------- UI ---------------- */
+function $(id){ return document.getElementById(id); }
 
-/* =========================
-   SAFE INIT SYSTEM
-========================= */
-function init() {
-
-  // Scene
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x05070a);
-
-  // Camera
-  camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-
-  camera.position.set(3.5, 8, 10);
-
-  // Renderer (CRITICAL: attach early)
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
-  document.body.appendChild(renderer.domElement);
-
-  // Controls (AFTER renderer exists)
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.target.copy(CENTER);
-  controls.update();
-
-  camera.lookAt(CENTER);
-
-  // Lights
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(10, 10, 10);
-  scene.add(light);
-
-  // Board
-  buildBoard();
-
-  // Resize safety
-  window.addEventListener("resize", resize);
-  resize();
-
-  document.getElementById("state").innerText = "READY";
-
-  animate();
+function switchScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $(id).classList.add("active");
 }
 
-/* =========================
-   BOARD
-========================= */
-function buildBoard() {
-  for (let x = 0; x < 8; x++) {
-    for (let z = 0; z < 8; z++) {
+function showEmail(text){
+  $("emailBox").innerText = text;
+}
 
-      const tile = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 0.2, 1),
-        new THREE.MeshStandardMaterial({
-          color: (x + z) % 2 ? 0x333333 : 0x777777
-        })
-      );
+/* ---------------- AUTH ---------------- */
 
-      tile.position.set(x, 0, z);
-      scene.add(tile);
-    }
+async function register(){
+  const name = $("name").value;
+  const email = $("regEmail").value;
+  const pass = $("regPass").value;
+
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+
+    await db.collection("users").doc(cred.user.uid).set({
+      name,
+      email,
+      created: Date.now()
+    });
+
+    showEmail(
+`Welcome ${name},
+
+Your Olympus Chess Hub account is active.
+
+Email: ${email}
+
+— Olympus System`
+    );
+
+    switchScreen("welcomeScreen");
+
+    // OPTIONAL EMAILJS HOOK (if enabled)
+    sendEmail(name, email);
+
+  } catch(e){
+    alert(e.message);
   }
-
-  const piece = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16),
-    new THREE.MeshStandardMaterial({ color: 0xffffff })
-  );
-
-  piece.position.set(2, 0.4, 2);
-  scene.add(piece);
 }
 
-/* =========================
-   RESIZE FIX (CRITICAL)
-========================= */
-function resize() {
-  const w = window.innerWidth || document.documentElement.clientWidth;
-  const h = window.innerHeight || document.documentElement.clientHeight;
+async function login(){
+  const email = $("email").value;
+  const pass = $("password").value;
 
-  if (!camera || !renderer) return;
+  try {
+    const cred = await auth.signInWithEmailAndPassword(email, pass);
 
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h, false);
-}
+    const doc = await db.collection("users").doc(cred.user.uid).get();
 
-/* =========================
-   LOOP
-========================= */
-function animate(t) {
-  requestAnimationFrame(animate);
+    showEmail(
+`Welcome back ${doc.data().name},
 
-  if (controls) controls.update();
-  if (renderer && scene && camera) {
-    renderer.render(scene, camera);
+System Status: ACTIVE
+Authentication: VERIFIED
+
+— Olympus Core`
+    );
+
+    switchScreen("welcomeScreen");
+
+  } catch(e){
+    alert("Login failed");
   }
-
-  TWEEN.update(t);
 }
 
-/* BOOT SEQUENCE (CRITICAL FIX) */
-window.addEventListener("load", () => {
-  init();
-});
+async function resetPassword(){
+  const email = $("resetEmail").value;
 
+  try {
+    await auth.sendPasswordResetEmail(email);
+    alert("Reset email sent");
+  } catch(e){
+    alert(e.message);
+  }
+}
+
+/* ---------------- OPTIONAL EMAILJS ---------------- */
+function sendEmail(name, email){
+  // requires EmailJS setup
+  // emailjs.send(SERVICE, TEMPLATE, {name, email});
+  console.log("Email trigger:", name, email);
+}
 </script>
 
 </body>
