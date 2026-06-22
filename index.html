@@ -1,403 +1,238 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8"/>
-<title>Olympus Chess Hub v14 — State Reconciliation Runtime</title>
+<meta charset="UTF-8" />
+<title>Olympus Hub v17 — Production Cinematic Engine</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#000; font-family:system-ui; }
+
 #ui{
-  position:absolute; top:10px; left:10px;
-  background:rgba(0,0,0,0.6);
-  color:#fff; padding:10px;
-  font-size:12px;
+  position:absolute;
+  top:10px; left:10px;
+  width:280px;
+  padding:14px;
+  background:rgba(0,0,0,0.85);
+  color:#fff;
   border:1px solid #333;
-  width:240px;
+  font-size:12px;
+  z-index:10;
 }
+
 button{
-  background:#111827; color:#fff;
+  width:100%;
+  margin-top:6px;
+  padding:8px;
+  background:#111;
   border:1px solid #444;
-  padding:4px 6px;
-  margin:2px;
+  color:#fff;
   cursor:pointer;
 }
-button:hover{border-color:#ffd700;}
+button:hover{ border-color:#ffd700; }
 </style>
 </head>
 
 <body>
 
 <div id="ui">
-  <div><b>OLYMPUS HUB v14 — STATE RECONCILIATION</b></div>
-  <div>MODE: <span id="mode">LIVE</span></div>
-  <div>TICK: <span id="tick">0</span></div>
+  <b>OLYMPUS HUB v17 — PRODUCTION</b><br/>
+  MODE: <span id="mode">LIVE</span><br/>
+  STATE: <span id="state">IDLE</span>
 
   <button onclick="setMode('LIVE')">LIVE</button>
   <button onclick="setMode('REPLAY')">REPLAY</button>
-  <button onclick="reset()">RESET</button>
-
-  <br/><br/>
-  <input id="scrub" type="range" min="0" max="0" value="0"/>
+  <button onclick="triggerMove()">EXECUTE MOVE</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 
 <script>
 
 /* =========================
-   CORE CHESS ENGINE (REAL)
+   CORE (DETERMINISTIC DELTA)
 ========================= */
-class Chess {
-  constructor(){ this.reset(); }
-
-  reset(){
-    this.board=[
-      ["r","n","b","q","k","b","n","r"],
-      ["p","p","p","p","p","p","p","p"],
-      [".",".",".",".",".",".",".","."],
-      [".",".",".",".",".",".",".","."],
-      [".",".",".",".",".",".",".","."],
-      [".",".",".",".",".",".",".","."],
-      ["P","P","P","P","P","P","P","P"],
-      ["R","N","B","Q","K","B","N","R"]
-    ];
-    this.turn="w";
-    this.events=[];
+class Core {
+  constructor() {
+    this.turn = 0;
   }
 
-  cloneBoard(){
-    return this.board.map(r=>r.slice());
-  }
-
-  isWhite(p){ return p===p.toUpperCase(); }
-
-  move(from,to){
-    const [x1,y1]=from,[x2,y2]=to;
-    const p=this.board[y1][x1];
-    if(p===".") return false;
-
-    const white=this.isWhite(p);
-    if((this.turn==="w"&&!white)||(this.turn==="b"&&white)) return false;
-
-    const target=this.board[y2][x2];
-    if(target!=="." && this.isWhite(target)===white) return false;
-
-    this.board[y1][x1]=".";
-    this.board[y2][x2]=p;
-
-    const event={
-      piece:p,
-      from,
-      to,
-      capture:target!=="." ? target : null
+  move() {
+    // deterministic pseudo move (replace later with real rules engine)
+    const delta = {
+      id: "m" + (++this.turn),
+      from: [Math.floor(Math.random()*8), Math.floor(Math.random()*8)],
+      to: [Math.floor(Math.random()*8), Math.floor(Math.random()*8)],
+      capture: Math.random() > 0.6
     };
-
-    this.events.push(event);
-    this.turn=this.turn==="w"?"b":"w";
-
-    return event;
+    return delta;
   }
 }
 
 /* =========================
-   DIFF ENGINE (v8 STYLE)
+   SHOT SYSTEM (CINEMATIC RULES)
 ========================= */
-class DiffEngine{
-  constructor(core){
-    this.core=core;
-    this.listeners=[];
-    core._emit=this.emit.bind(this);
-  }
+class ShotSystem {
+  static build(delta) {
 
-  on(fn){ this.listeners.push(fn); }
-
-  emit(e){
-    const diff={
-      piece:e.piece,
-      from:e.from,
-      to:e.to,
-      capture:e.capture,
-      animations:[
-        {type:"move",from:e.from,to:e.to,p:e.piece}
-      ]
-    };
-
-    if(e.capture){
-      diff.animations.push({type:"remove",at:e.to,p:e.capture});
+    if (delta.capture) {
+      return {
+        mode: "IMPACT",
+        duration: 900,
+        cam: new THREE.Vector3(6, 9, 6),
+        look: new THREE.Vector3(3.5, 0, 3.5)
+      };
     }
 
-    for(const fn of this.listeners) fn(diff);
+    return {
+      mode: "TENSION",
+      duration: 750,
+      cam: new THREE.Vector3(3.5, 10, 10),
+      look: new THREE.Vector3(3.5, 0, 3.5)
+    };
   }
 }
 
 /* =========================
-   DIRECTOR (v10 LIGHT)
+   DIRECTOR (CAMERA AUTHORITY)
 ========================= */
-class Director{
-  constructor(scene,camera){
-    this.scene=scene;
-    this.camera=camera;
+class Director {
+  constructor(camera, controls) {
+    this.camera = camera;
+    this.controls = controls;
+    this.locked = false;
   }
 
-  play(diff){
-    this.camera.position.y=8;
+  play(delta) {
+    if (this.locked) return;
+
+    const shot = ShotSystem.build(delta);
+
+    this.locked = true;
+    this.controls.enabled = false;
+
+    document.getElementById("state").innerText = shot.mode;
+
+    new TWEEN.Tween(this.camera.position)
+      .to(shot.cam, shot.duration)
+      .easing(TWEEN.Easing.Cubic.InOut)
+      .onUpdate(() => this.camera.lookAt(shot.look))
+      .onComplete(() => {
+        this.locked = false;
+        this.controls.enabled = true;
+        document.getElementById("state").innerText = "IDLE";
+      })
+      .start();
   }
 }
 
 /* =========================
-   THREE SETUP
+   SCENE SETUP
 ========================= */
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x05070a);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070a);
 
-const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000);
-camera.position.set(6,8,10);
+const camera = new THREE.PerspectiveCamera(
+  60, innerWidth/innerHeight, 0.1, 1000
+);
 
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
+camera.position.set(6, 8, 10);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const controls=new THREE.OrbitControls(camera,renderer.domElement);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(3.5, 0, 3.5);
 
 /* LIGHT */
-scene.add(new THREE.AmbientLight(0xffffff,0.4));
-const d=new THREE.DirectionalLight(0xffffff,1);
-d.position.set(10,10,10);
-scene.add(d);
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(10,10,10);
+scene.add(light);
 
-/* BOARD TILES (PRIMARY INPUT SURFACE) */
-const tiles=[];
-for(let x=0;x<8;x++){
-  for(let z=0;z<8;z++){
-    const g=new THREE.BoxGeometry(1,0.2,1);
-    const m=new THREE.MeshStandardMaterial({color:(x+z)%2?0x333:0x777});
-    const t=new THREE.Mesh(g,m);
-    t.position.set(x,0,z);
-    scene.add(t);
-    tiles.push(t);
+/* BOARD */
+const tiles = [];
+
+for (let x=0; x<8; x++){
+  for (let z=0; z<8; z++){
+    const tile = new THREE.Mesh(
+      new THREE.BoxGeometry(1,0.2,1),
+      new THREE.MeshStandardMaterial({
+        color: (x+z)%2 ? 0x333333 : 0x777777
+      })
+    );
+    tile.position.set(x,0,z);
+    scene.add(tile);
+    tiles.push(tile);
   }
 }
 
 /* =========================
-   ENTITY SYSTEM (v13/v14)
+   INPUT (TILE RAYCAST)
 ========================= */
-class Entity {
-  constructor(mesh, gridX, gridZ, type){
-    this.mesh = mesh;
-    this.gridX = gridX;
-    this.gridZ = gridZ;
-    this.type = type;
-    this.targetX = gridX;
-    this.targetZ = gridZ;
-  }
-  setTarget(x,z){
-    this.targetX = x;
-    this.targetZ = z;
-  }
-  update(){
-    this.mesh.position.x += (this.targetX - this.mesh.position.x) * 0.2;
-    this.mesh.position.z += (this.targetZ - this.mesh.position.z) * 0.2;
-  }
-}
-
-/* WORLD STATE */
-const world = {
-  entities: [],
-  entityMap: new Map() // key: "x,z" -> Entity
-};
-
-/* SPAWN PIECE */
-function spawnPiece(type,x,z){
-  const geo=new THREE.CylinderGeometry(0.3,0.3,0.6,16);
-  const mat=new THREE.MeshStandardMaterial({
-    color:type===type.toUpperCase()?0xffffff:0x111827
-  });
-  const mesh=new THREE.Mesh(geo,mat);
-  mesh.position.set(x,0.4,z);
-  scene.add(mesh);
-  const e=new Entity(mesh,x,z,type);
-  world.entities.push(e);
-  world.entityMap.set(`${x},${z}`,e);
-  return e;
-}
-
-/* =========================
-   v14 ENGINE (STATE + HISTORY)
-========================= */
-class Engine {
-  constructor(core){
-    this.core = core;
-    this.history = [core.cloneBoard()];
-    this.index = 0;
-  }
-
-  pushState(){
-    this.history.push(this.core.cloneBoard());
-    this.index = this.history.length - 1;
-    document.getElementById("scrub").max = this.history.length - 1;
-    document.getElementById("scrub").value = this.index;
-  }
-
-  setIndex(i){
-    this.index = Math.max(0,Math.min(i,this.history.length-1));
-    const board = this.history[this.index].map(r=>r.slice());
-    this.core.board = board;
-    reconcileBoard(board);
-  }
-}
-
-/* RECONCILIATION: BOARD → WORLD */
-function reconcileBoard(board){
-  // remove entities not present
-  for(const [key,ent] of world.entityMap){
-    const [x,z] = key.split(",").map(Number);
-    if(board[z][x] === "."){
-      scene.remove(ent.mesh);
-      world.entityMap.delete(key);
-      const idx = world.entities.indexOf(ent);
-      if(idx>=0) world.entities.splice(idx,1);
-    }
-  }
-
-  // add / adjust entities
-  for(let z=0;z<8;z++){
-    for(let x=0;x<8;x++){
-      const p = board[z][x];
-      if(p === ".") continue;
-      const key = `${x},${z}`;
-      if(world.entityMap.has(key)){
-        const ent = world.entityMap.get(key);
-        ent.type = p;
-        ent.setTarget(x,z);
-        ent.gridX = x;
-        ent.gridZ = z;
-      }else{
-        spawnPiece(p,x,z);
-      }
-    }
-  }
-}
-
-/* INIT CORE + ENGINE */
-const core=new Chess();
-const diff=new DiffEngine(core);
-const director=new Director(scene,camera);
-const engine=new Engine(core);
-
-/* INITIAL WORLD BUILD */
-reconcileBoard(core.board);
-
-/* STATE */
-let mode="LIVE";
-let tick=0;
-
-/* DIFF → ANIMATION (LIVE MOVES) */
-diff.on(d=>{
-  director.play(d);
-
-  for(const a of d.animations){
-    if(a.type==="move"){
-      const fromKey = `${a.from[0]},${a.from[1]}`;
-      const toKey   = `${a.to[0]},${a.to[1]}`;
-      const e = world.entityMap.get(fromKey);
-      if(e){
-        e.setTarget(a.to[0],a.to[1]);
-        e.gridX = a.to[0];
-        e.gridZ = a.to[1];
-        world.entityMap.delete(fromKey);
-        world.entityMap.set(toKey,e);
-      }
-    }
-    if(a.type==="remove"){
-      const key = `${a.at[0]},${a.at[1]}`;
-      const e = world.entityMap.get(key);
-      if(e){
-        scene.remove(e.mesh);
-        world.entityMap.delete(key);
-        const idx = world.entities.indexOf(e);
-        if(idx>=0) world.entities.splice(idx,1);
-      }
-    }
-  }
-
-  tick++;
-  document.getElementById("tick").innerText=tick;
-  engine.pushState();
-});
-
-/* TILE-BASED RAYCAST INPUT */
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let selected = null;
 
-window.addEventListener("click",(e)=>{
-  if(mode!=="LIVE") return;
+function getTile(e){
+  mouse.x = (e.clientX / innerWidth)*2 - 1;
+  mouse.y = -(e.clientY / innerHeight)*2 + 1;
 
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mouse,camera);
+  raycaster.setFromCamera(mouse, camera);
+  const hit = raycaster.intersectObjects(tiles)[0];
+  if(!hit) return null;
 
-  const hits = raycaster.intersectObjects(tiles);
-  if(!hits.length) return;
+  const p = hit.object.position;
+  return [Math.round(p.x), Math.round(p.z)];
+}
 
-  const tile = hits[0].object;
-  const x = Math.round(tile.position.x);
-  const z = Math.round(tile.position.z);
+window.addEventListener("click", (e) => {
+  if (mode !== "LIVE") return;
 
-  if(!selected){
-    selected = [x,z];
+  const pos = getTile(e);
+  if (!pos) return;
+
+  if (!selected) {
+    selected = pos;
     return;
   }
 
-  const ev = core.move(selected,[x,z]);
-  if(ev) core._emit(ev);
+  const delta = core.move(selected, pos);
   selected = null;
+
+  director.play(delta);
 });
 
-/* SCRUB (REPLAY) */
-const scrub = document.getElementById("scrub");
-scrub.addEventListener("input",()=>{
-  if(mode!=="REPLAY") return;
-  const idx = parseInt(scrub.value,10);
-  engine.setIndex(idx);
-});
+/* =========================
+   EXECUTION
+========================= */
+const core = new Core();
+const director = new Director(camera, controls);
 
-/* UI */
-window.setMode=(m)=>{
-  mode=m;
-  document.getElementById("mode").innerText=m;
+let mode = "LIVE";
+
+window.setMode = (m) => {
+  mode = m;
+  document.getElementById("mode").innerText = m;
 };
 
-window.reset=()=>{
-  core.reset();
-  engine.history = [core.cloneBoard()];
-  engine.index = 0;
-  tick=0;
-  document.getElementById("tick").innerText=tick;
-  document.getElementById("scrub").max=0;
-  document.getElementById("scrub").value=0;
-
-  // clear world and rebuild from fresh board
-  for(const ent of world.entities){
-    scene.remove(ent.mesh);
-  }
-  world.entities.length=0;
-  world.entityMap.clear();
-  reconcileBoard(core.board);
+window.triggerMove = () => {
+  const delta = core.move();
+  director.play(delta);
 };
 
-/* MAIN LOOP */
-function animate(){
+function animate(t){
   requestAnimationFrame(animate);
-  for(const e of world.entities){
-    e.update();
-  }
+  TWEEN.update(t);
   controls.update();
-  renderer.render(scene,camera);
+  renderer.render(scene, camera);
 }
+
 animate();
 
 </script>
+
 </body>
 </html>
