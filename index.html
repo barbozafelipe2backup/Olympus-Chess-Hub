@@ -2,40 +2,56 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Olympus Hub v17 — Production Cinematic Engine</title>
+<title>Olympus Hub v17 — Production Build</title>
 
 <style>
-body { margin:0; overflow:hidden; background:#000; font-family:system-ui; }
-
-#ui{
-  position:absolute;
-  top:10px; left:10px;
-  width:280px;
-  padding:14px;
-  background:rgba(0,0,0,0.85);
-  color:#fff;
-  border:1px solid #333;
-  font-size:12px;
-  z-index:10;
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  font-family: system-ui;
 }
 
-button{
-  width:100%;
-  margin-top:6px;
-  padding:8px;
-  background:#111;
-  border:1px solid #444;
-  color:#fff;
-  cursor:pointer;
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
 }
-button:hover{ border-color:#ffd700; }
+
+#ui {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0,0,0,0.85);
+  color: white;
+  padding: 12px;
+  width: 260px;
+  border: 1px solid #444;
+  z-index: 10;
+  font-size: 12px;
+}
+button {
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px;
+  background: #111;
+  border: 1px solid #444;
+  color: white;
+  cursor: pointer;
+}
+button:hover {
+  border-color: gold;
+}
 </style>
 </head>
 
 <body>
 
 <div id="ui">
-  <b>OLYMPUS HUB v17 — PRODUCTION</b><br/>
+  <b>OLYMPUS HUB v17</b><br/>
   MODE: <span id="mode">LIVE</span><br/>
   STATE: <span id="state">IDLE</span>
 
@@ -51,51 +67,38 @@ button:hover{ border-color:#ffd700; }
 <script>
 
 /* =========================
-   CORE (DETERMINISTIC DELTA)
+   CORE ENGINE
 ========================= */
 class Core {
   constructor() {
-    this.turn = 0;
+    this.board = this.createBoard();
+    this.turn = "w";
+  }
+
+  createBoard() {
+    return [
+      ["r","n","b","q","k","b","n","r"],
+      ["p","p","p","p","p","p","p","p"],
+      [".",".",".",".",".",".",".","."],
+      [".",".",".",".",".",".",".","."],
+      [".",".",".",".",".",".",".","."],
+      [".",".",".",".",".",".",".","."],
+      ["P","P","P","P","P","P","P","P"],
+      ["R","N","B","Q","K","B","N","R"]
+    ];
   }
 
   move() {
-    // deterministic pseudo move (replace later with real rules engine)
-    const delta = {
-      id: "m" + (++this.turn),
-      from: [Math.floor(Math.random()*8), Math.floor(Math.random()*8)],
-      to: [Math.floor(Math.random()*8), Math.floor(Math.random()*8)],
-      capture: Math.random() > 0.6
-    };
-    return delta;
-  }
-}
-
-/* =========================
-   SHOT SYSTEM (CINEMATIC RULES)
-========================= */
-class ShotSystem {
-  static build(delta) {
-
-    if (delta.capture) {
-      return {
-        mode: "IMPACT",
-        duration: 900,
-        cam: new THREE.Vector3(6, 9, 6),
-        look: new THREE.Vector3(3.5, 0, 3.5)
-      };
-    }
-
     return {
-      mode: "TENSION",
-      duration: 750,
-      cam: new THREE.Vector3(3.5, 10, 10),
-      look: new THREE.Vector3(3.5, 0, 3.5)
+      from: [2,2],
+      to: [5,5],
+      capture: Math.random() > 0.5
     };
   }
 }
 
 /* =========================
-   DIRECTOR (CAMERA AUTHORITY)
+   DIRECTOR
 ========================= */
 class Director {
   constructor(camera, controls) {
@@ -105,19 +108,22 @@ class Director {
   }
 
   play(delta) {
-    if (this.locked) return;
-
-    const shot = ShotSystem.build(delta);
-
     this.locked = true;
     this.controls.enabled = false;
 
-    document.getElementById("state").innerText = shot.mode;
+    const mode = delta.capture ? "IMPACT" : "TENSION";
+
+    const targetPos =
+      mode === "IMPACT"
+        ? new THREE.Vector3(6, 9, 6)
+        : new THREE.Vector3(3.5, 10, 10);
+
+    const look = new THREE.Vector3(3.5, 0, 3.5);
 
     new TWEEN.Tween(this.camera.position)
-      .to(shot.cam, shot.duration)
+      .to(targetPos, 900)
       .easing(TWEEN.Easing.Cubic.InOut)
-      .onUpdate(() => this.camera.lookAt(shot.look))
+      .onUpdate(() => this.camera.lookAt(look))
       .onComplete(() => {
         this.locked = false;
         this.controls.enabled = true;
@@ -128,104 +134,165 @@ class Director {
 }
 
 /* =========================
-   SCENE SETUP
+   RENDERER SETUP
 ========================= */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05070a);
 
 const camera = new THREE.PerspectiveCamera(
-  60, innerWidth/innerHeight, 0.1, 1000
+  60,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
 );
 
-camera.position.set(6, 8, 10);
+// FIXED CAMERA CENTER
+camera.position.set(3.5, 8, 10);
+camera.lookAt(3.5, 0, 3.5);
 
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(innerWidth, innerHeight);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.target.set(3.5, 0, 3.5);
+controls.update();
 
-/* LIGHT */
+/* LIGHTS */
 scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(10,10,10);
+light.position.set(10, 10, 10);
 scene.add(light);
 
 /* BOARD */
 const tiles = [];
+for (let x = 0; x < 8; x++) {
+  for (let z = 0; z < 8; z++) {
+    const geo = new THREE.BoxGeometry(1, 0.2, 1);
+    const mat = new THREE.MeshStandardMaterial({
+      color: (x + z) % 2 ? 0x333333 : 0x777777
+    });
 
-for (let x=0; x<8; x++){
-  for (let z=0; z<8; z++){
-    const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(1,0.2,1),
-      new THREE.MeshStandardMaterial({
-        color: (x+z)%2 ? 0x333333 : 0x777777
-      })
-    );
-    tile.position.set(x,0,z);
+    const tile = new THREE.Mesh(geo, mat);
+    tile.position.set(x, 0, z);
     scene.add(tile);
     tiles.push(tile);
   }
 }
 
 /* =========================
-   INPUT (TILE RAYCAST)
+   ENTITIES
 ========================= */
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let selected = null;
-
-function getTile(e){
-  mouse.x = (e.clientX / innerWidth)*2 - 1;
-  mouse.y = -(e.clientY / innerHeight)*2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-  const hit = raycaster.intersectObjects(tiles)[0];
-  if(!hit) return null;
-
-  const p = hit.object.position;
-  return [Math.round(p.x), Math.round(p.z)];
-}
-
-window.addEventListener("click", (e) => {
-  if (mode !== "LIVE") return;
-
-  const pos = getTile(e);
-  if (!pos) return;
-
-  if (!selected) {
-    selected = pos;
-    return;
+class Entity {
+  constructor(mesh, x, z) {
+    this.mesh = mesh;
+    this.x = x;
+    this.z = z;
+    this.tx = x;
+    this.tz = z;
   }
 
-  const delta = core.move(selected, pos);
-  selected = null;
+  setTarget(x, z) {
+    this.tx = x;
+    this.tz = z;
+  }
 
-  director.play(delta);
-});
+  update() {
+    this.mesh.position.x += (this.tx - this.mesh.position.x) * 0.2;
+    this.mesh.position.z += (this.tz - this.mesh.position.z) * 0.2;
+  }
+}
+
+const world = {
+  entities: []
+};
+
+function spawnPiece(x, z) {
+  const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, 0.4, z);
+
+  scene.add(mesh);
+
+  const e = new Entity(mesh, x, z);
+  world.entities.push(e);
+  return e;
+}
+
+/* INIT PIECE */
+spawnPiece(2,2);
 
 /* =========================
-   EXECUTION
+   SYSTEMS
 ========================= */
 const core = new Core();
 const director = new Director(camera, controls);
 
-let mode = "LIVE";
+let selected = null;
 
+/* INPUT */
+window.addEventListener("click", (e) => {
+  const ray = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  ray.setFromCamera(mouse, camera);
+
+  const hit = ray.intersectObjects(tiles);
+  if (!hit.length) return;
+
+  const x = Math.round(hit[0].object.position.x);
+  const z = Math.round(hit[0].object.position.z);
+
+  if (!selected) {
+    selected = [x, z];
+    return;
+  }
+
+  const delta = core.move();
+  director.play(delta);
+
+  document.getElementById("state").innerText =
+    delta.capture ? "IMPACT" : "TENSION";
+
+  selected = null;
+});
+
+/* UI */
 window.setMode = (m) => {
-  mode = m;
   document.getElementById("mode").innerText = m;
 };
 
 window.triggerMove = () => {
   const delta = core.move();
   director.play(delta);
+  document.getElementById("state").innerText =
+    delta.capture ? "IMPACT" : "TENSION";
 };
 
-function animate(t){
+/* RESIZE FIX (CRITICAL) */
+function resize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+/* LOOP */
+function animate(time) {
   requestAnimationFrame(animate);
-  TWEEN.update(t);
+
+  for (const e of world.entities) {
+    e.update();
+  }
+
+  TWEEN.update(time);
   controls.update();
   renderer.render(scene, camera);
 }
@@ -233,6 +300,5 @@ function animate(t){
 animate();
 
 </script>
-
 </body>
 </html>
