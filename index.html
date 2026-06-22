@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>Olympus Chess Hub v12 NEXT</title>
+<title>Olympus Chess Hub v14 — State Reconciliation Runtime</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#000; font-family:system-ui; }
@@ -12,7 +12,7 @@ body { margin:0; overflow:hidden; background:#000; font-family:system-ui; }
   color:#fff; padding:10px;
   font-size:12px;
   border:1px solid #333;
-  width:220px;
+  width:240px;
 }
 button{
   background:#111827; color:#fff;
@@ -28,7 +28,7 @@ button:hover{border-color:#ffd700;}
 <body>
 
 <div id="ui">
-  <div><b>OLYMPUS HUB v12 NEXT</b></div>
+  <div><b>OLYMPUS HUB v14 — STATE RECONCILIATION</b></div>
   <div>MODE: <span id="mode">LIVE</span></div>
   <div>TICK: <span id="tick">0</span></div>
 
@@ -66,7 +66,9 @@ class Chess {
     this.events=[];
   }
 
-  clone(b){ return b.map(r=>r.slice()); }
+  cloneBoard(){
+    return this.board.map(r=>r.slice());
+  }
 
   isWhite(p){ return p===p.toUpperCase(); }
 
@@ -81,7 +83,6 @@ class Chess {
     const target=this.board[y2][x2];
     if(target!=="." && this.isWhite(target)===white) return false;
 
-    // VERY simplified legality (keep deterministic core clean)
     this.board[y1][x1]=".";
     this.board[y2][x2]=p;
 
@@ -140,7 +141,6 @@ class Director{
   }
 
   play(diff){
-    // simple cinematic hook
     this.camera.position.y=8;
   }
 }
@@ -166,10 +166,8 @@ const d=new THREE.DirectionalLight(0xffffff,1);
 d.position.set(10,10,10);
 scene.add(d);
 
-/* BOARD */
-const pieces=[];
+/* BOARD TILES (PRIMARY INPUT SURFACE) */
 const tiles=[];
-
 for(let x=0;x<8;x++){
   for(let z=0;z<8;z++){
     const g=new THREE.BoxGeometry(1,0.2,1);
@@ -181,90 +179,220 @@ for(let x=0;x<8;x++){
   }
 }
 
-/* PIECES */
-function spawn(p,x,z){
-  const geo=new THREE.CylinderGeometry(0.3,0.3,0.6,16);
-  const mat=new THREE.MeshStandardMaterial({color:p===p.toUpperCase()?0xffffff:0x111827});
-  const m=new THREE.Mesh(geo,mat);
-  m.position.set(x,0.4,z);
-  m.userData={x,z,p};
-  scene.add(m);
-  pieces.push(m);
-  return m;
+/* =========================
+   ENTITY SYSTEM (v13/v14)
+========================= */
+class Entity {
+  constructor(mesh, gridX, gridZ, type){
+    this.mesh = mesh;
+    this.gridX = gridX;
+    this.gridZ = gridZ;
+    this.type = type;
+    this.targetX = gridX;
+    this.targetZ = gridZ;
+  }
+  setTarget(x,z){
+    this.targetX = x;
+    this.targetZ = z;
+  }
+  update(){
+    this.mesh.position.x += (this.targetX - this.mesh.position.x) * 0.2;
+    this.mesh.position.z += (this.targetZ - this.mesh.position.z) * 0.2;
+  }
 }
 
-const core=new Chess();
-const diff=new DiffEngine(core);
-const director=new Director(scene,camera);
+/* WORLD STATE */
+const world = {
+  entities: [],
+  entityMap: new Map() // key: "x,z" -> Entity
+};
 
-/* INIT PIECES */
-function rebuild(){
-  pieces.forEach(p=>scene.remove(p));
-  pieces.length=0;
-  for(let y=0;y<8;y++){
+/* SPAWN PIECE */
+function spawnPiece(type,x,z){
+  const geo=new THREE.CylinderGeometry(0.3,0.3,0.6,16);
+  const mat=new THREE.MeshStandardMaterial({
+    color:type===type.toUpperCase()?0xffffff:0x111827
+  });
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set(x,0.4,z);
+  scene.add(mesh);
+  const e=new Entity(mesh,x,z,type);
+  world.entities.push(e);
+  world.entityMap.set(`${x},${z}`,e);
+  return e;
+}
+
+/* =========================
+   v14 ENGINE (STATE + HISTORY)
+========================= */
+class Engine {
+  constructor(core){
+    this.core = core;
+    this.history = [core.cloneBoard()];
+    this.index = 0;
+  }
+
+  pushState(){
+    this.history.push(this.core.cloneBoard());
+    this.index = this.history.length - 1;
+    document.getElementById("scrub").max = this.history.length - 1;
+    document.getElementById("scrub").value = this.index;
+  }
+
+  setIndex(i){
+    this.index = Math.max(0,Math.min(i,this.history.length-1));
+    const board = this.history[this.index].map(r=>r.slice());
+    this.core.board = board;
+    reconcileBoard(board);
+  }
+}
+
+/* RECONCILIATION: BOARD → WORLD */
+function reconcileBoard(board){
+  // remove entities not present
+  for(const [key,ent] of world.entityMap){
+    const [x,z] = key.split(",").map(Number);
+    if(board[z][x] === "."){
+      scene.remove(ent.mesh);
+      world.entityMap.delete(key);
+      const idx = world.entities.indexOf(ent);
+      if(idx>=0) world.entities.splice(idx,1);
+    }
+  }
+
+  // add / adjust entities
+  for(let z=0;z<8;z++){
     for(let x=0;x<8;x++){
-      const p=core.board[y][x];
-      if(p!=="." ) spawn(p,x,y);
+      const p = board[z][x];
+      if(p === ".") continue;
+      const key = `${x},${z}`;
+      if(world.entityMap.has(key)){
+        const ent = world.entityMap.get(key);
+        ent.type = p;
+        ent.setTarget(x,z);
+        ent.gridX = x;
+        ent.gridZ = z;
+      }else{
+        spawnPiece(p,x,z);
+      }
     }
   }
 }
-rebuild();
+
+/* INIT CORE + ENGINE */
+const core=new Chess();
+const diff=new DiffEngine(core);
+const director=new Director(scene,camera);
+const engine=new Engine(core);
+
+/* INITIAL WORLD BUILD */
+reconcileBoard(core.board);
 
 /* STATE */
 let mode="LIVE";
 let tick=0;
 
-/* DIFF HANDLER */
+/* DIFF → ANIMATION (LIVE MOVES) */
 diff.on(d=>{
   director.play(d);
 
-  d.animations.forEach(a=>{
+  for(const a of d.animations){
     if(a.type==="move"){
-      const obj=pieces.find(p=>p.userData.x===a.from[0]&&p.userData.z===a.from[1]);
-      if(obj){
-        obj.position.x=a.to[0];
-        obj.position.z=a.to[1];
-        obj.userData.x=a.to[0];
-        obj.userData.z=a.to[1];
+      const fromKey = `${a.from[0]},${a.from[1]}`;
+      const toKey   = `${a.to[0]},${a.to[1]}`;
+      const e = world.entityMap.get(fromKey);
+      if(e){
+        e.setTarget(a.to[0],a.to[1]);
+        e.gridX = a.to[0];
+        e.gridZ = a.to[1];
+        world.entityMap.delete(fromKey);
+        world.entityMap.set(toKey,e);
       }
     }
     if(a.type==="remove"){
-      const obj=pieces.find(p=>p.userData.x===a.at[0]&&p.userData.z===a.at[1]);
-      if(obj) scene.remove(obj);
+      const key = `${a.at[0]},${a.at[1]}`;
+      const e = world.entityMap.get(key);
+      if(e){
+        scene.remove(e.mesh);
+        world.entityMap.delete(key);
+        const idx = world.entities.indexOf(e);
+        if(idx>=0) world.entities.splice(idx,1);
+      }
     }
-  });
+  }
 
   tick++;
   document.getElementById("tick").innerText=tick;
-  document.getElementById("scrub").max=tick;
+  engine.pushState();
 });
 
-/* INPUT */
-window.onclick=(e)=>{
+/* TILE-BASED RAYCAST INPUT */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let selected = null;
+
+window.addEventListener("click",(e)=>{
   if(mode!=="LIVE") return;
 
-  const x=Math.floor((e.clientX/innerWidth)*8);
-  const z=Math.floor((e.clientY/innerHeight)*8);
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse,camera);
 
-  if(window.sel==null){
-    window.sel=[x,z];
-  }else{
-    const ev=core.move(window.sel,[x,z]);
-    if(ev) core._emit(ev);
-    window.sel=null;
+  const hits = raycaster.intersectObjects(tiles);
+  if(!hits.length) return;
+
+  const tile = hits[0].object;
+  const x = Math.round(tile.position.x);
+  const z = Math.round(tile.position.z);
+
+  if(!selected){
+    selected = [x,z];
+    return;
   }
-};
+
+  const ev = core.move(selected,[x,z]);
+  if(ev) core._emit(ev);
+  selected = null;
+});
+
+/* SCRUB (REPLAY) */
+const scrub = document.getElementById("scrub");
+scrub.addEventListener("input",()=>{
+  if(mode!=="REPLAY") return;
+  const idx = parseInt(scrub.value,10);
+  engine.setIndex(idx);
+});
 
 /* UI */
-window.setMode=(m)=>mode=m;
-window.reset=()=>{
-  core.reset();
-  rebuild();
-  tick=0;
+window.setMode=(m)=>{
+  mode=m;
+  document.getElementById("mode").innerText=m;
 };
 
+window.reset=()=>{
+  core.reset();
+  engine.history = [core.cloneBoard()];
+  engine.index = 0;
+  tick=0;
+  document.getElementById("tick").innerText=tick;
+  document.getElementById("scrub").max=0;
+  document.getElementById("scrub").value=0;
+
+  // clear world and rebuild from fresh board
+  for(const ent of world.entities){
+    scene.remove(ent.mesh);
+  }
+  world.entities.length=0;
+  world.entityMap.clear();
+  reconcileBoard(core.board);
+};
+
+/* MAIN LOOP */
 function animate(){
   requestAnimationFrame(animate);
+  for(const e of world.entities){
+    e.update();
+  }
   controls.update();
   renderer.render(scene,camera);
 }
