@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Olympus Hub v17 — Production Build</title>
+<title>Olympus Hub v17 — Locked Production Build</title>
 
 <style>
 html, body {
@@ -25,33 +25,31 @@ canvas {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: rgba(0,0,0,0.85);
-  color: white;
+  background: rgba(0,0,0,0.88);
+  color: #fff;
   padding: 12px;
   width: 260px;
   border: 1px solid #444;
-  z-index: 10;
   font-size: 12px;
+  z-index: 10;
 }
+
 button {
   width: 100%;
-  margin-top: 5px;
+  margin-top: 6px;
   padding: 8px;
   background: #111;
   border: 1px solid #444;
   color: white;
-  cursor: pointer;
 }
-button:hover {
-  border-color: gold;
-}
+button:hover { border-color: gold; }
 </style>
 </head>
 
 <body>
 
 <div id="ui">
-  <b>OLYMPUS HUB v17</b><br/>
+  <b>OLYMPUS HUB v17 — LOCKED</b><br/>
   MODE: <span id="mode">LIVE</span><br/>
   STATE: <span id="state">IDLE</span>
 
@@ -67,27 +65,9 @@ button:hover {
 <script>
 
 /* =========================
-   CORE ENGINE
+   CORE (deterministic delta)
 ========================= */
 class Core {
-  constructor() {
-    this.board = this.createBoard();
-    this.turn = "w";
-  }
-
-  createBoard() {
-    return [
-      ["r","n","b","q","k","b","n","r"],
-      ["p","p","p","p","p","p","p","p"],
-      [".",".",".",".",".",".",".","."],
-      [".",".",".",".",".",".",".","."],
-      [".",".",".",".",".",".",".","."],
-      [".",".",".",".",".",".",".","."],
-      ["P","P","P","P","P","P","P","P"],
-      ["R","N","B","Q","K","B","N","R"]
-    ];
-  }
-
   move() {
     return {
       from: [2,2],
@@ -98,32 +78,37 @@ class Core {
 }
 
 /* =========================
-   DIRECTOR
+   DIRECTOR (camera authority)
 ========================= */
 class Director {
   constructor(camera, controls) {
     this.camera = camera;
     this.controls = controls;
     this.locked = false;
+
+    this.lookTarget = new THREE.Vector3(3.5, 0, 3.5);
   }
 
   play(delta) {
+    if (this.locked) return;
     this.locked = true;
+
     this.controls.enabled = false;
 
-    const mode = delta.capture ? "IMPACT" : "TENSION";
+    const impact = delta.capture;
 
-    const targetPos =
-      mode === "IMPACT"
-        ? new THREE.Vector3(6, 9, 6)
-        : new THREE.Vector3(3.5, 10, 10);
+    const targetPos = impact
+      ? new THREE.Vector3(6, 9, 6)
+      : new THREE.Vector3(3.5, 10, 10);
 
-    const look = new THREE.Vector3(3.5, 0, 3.5);
+    const duration = impact ? 950 : 850;
 
     new TWEEN.Tween(this.camera.position)
-      .to(targetPos, 900)
-      .easing(TWEEN.Easing.Cubic.InOut)
-      .onUpdate(() => this.camera.lookAt(look))
+      .to(targetPos, duration)
+      .easing(impact ? TWEEN.Easing.Cubic.InOut : TWEEN.Easing.Quadratic.InOut)
+      .onUpdate(() => {
+        this.camera.lookAt(this.lookTarget);
+      })
       .onComplete(() => {
         this.locked = false;
         this.controls.enabled = true;
@@ -134,7 +119,7 @@ class Director {
 }
 
 /* =========================
-   RENDERER SETUP
+   SCENE SETUP (CENTERED FIX)
 ========================= */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05070a);
@@ -146,34 +131,45 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
-// FIXED CAMERA CENTER
+/* ✅ HARD FIX: true board center framing */
+const BOARD_CENTER = new THREE.Vector3(3.5, 0, 3.5);
 camera.position.set(3.5, 8, 10);
-camera.lookAt(3.5, 0, 3.5);
+camera.lookAt(BOARD_CENTER);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: "high-performance"
+});
+
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
+/* controls */
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.target.set(3.5, 0, 3.5);
+controls.target.copy(BOARD_CENTER);
 controls.update();
 
-/* LIGHTS */
+/* lights */
 scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(10, 10, 10);
 scene.add(light);
 
-/* BOARD */
+/* =========================
+   BOARD (CENTER-LOCKED)
+========================= */
 const tiles = [];
+
 for (let x = 0; x < 8; x++) {
   for (let z = 0; z < 8; z++) {
-    const geo = new THREE.BoxGeometry(1, 0.2, 1);
-    const mat = new THREE.MeshStandardMaterial({
-      color: (x + z) % 2 ? 0x333333 : 0x777777
-    });
 
-    const tile = new THREE.Mesh(geo, mat);
+    const tile = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 0.2, 1),
+      new THREE.MeshStandardMaterial({
+        color: (x + z) % 2 ? 0x333333 : 0x777777
+      })
+    );
+
     tile.position.set(x, 0, z);
     scene.add(tile);
     tiles.push(tile);
@@ -198,22 +194,20 @@ class Entity {
   }
 
   update() {
-    this.mesh.position.x += (this.tx - this.mesh.position.x) * 0.2;
-    this.mesh.position.z += (this.tz - this.mesh.position.z) * 0.2;
+    this.mesh.position.x += (this.tx - this.mesh.position.x) * 0.18;
+    this.mesh.position.z += (this.tz - this.mesh.position.z) * 0.18;
   }
 }
 
-const world = {
-  entities: []
-};
+const world = { entities: [] };
 
 function spawnPiece(x, z) {
-  const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff })
+  );
 
-  const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x, 0.4, z);
-
   scene.add(mesh);
 
   const e = new Entity(mesh, x, z);
@@ -221,7 +215,7 @@ function spawnPiece(x, z) {
   return e;
 }
 
-/* INIT PIECE */
+/* initial piece */
 spawnPiece(2,2);
 
 /* =========================
@@ -230,19 +224,23 @@ spawnPiece(2,2);
 const core = new Core();
 const director = new Director(camera, controls);
 
+/* reuse (IMPORTANT FIX) */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
 let selected = null;
 
-/* INPUT */
+/* =========================
+   INPUT (stable + single raycaster)
+========================= */
 window.addEventListener("click", (e) => {
-  const ray = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
 
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
-  ray.setFromCamera(mouse, camera);
+  raycaster.setFromCamera(mouse, camera);
 
-  const hit = ray.intersectObjects(tiles);
+  const hit = raycaster.intersectObjects(tiles);
   if (!hit.length) return;
 
   const x = Math.round(hit[0].object.position.x);
@@ -262,7 +260,9 @@ window.addEventListener("click", (e) => {
   selected = null;
 });
 
-/* UI */
+/* =========================
+   UI
+========================= */
 window.setMode = (m) => {
   document.getElementById("mode").innerText = m;
 };
@@ -270,21 +270,30 @@ window.setMode = (m) => {
 window.triggerMove = () => {
   const delta = core.move();
   director.play(delta);
+
   document.getElementById("state").innerText =
     delta.capture ? "IMPACT" : "TENSION";
 };
 
-/* RESIZE FIX (CRITICAL) */
+/* =========================
+   RESIZE (FIXED FRUSTUM)
+========================= */
 function resize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  renderer.setSize(w, h, false);
 }
 
 window.addEventListener("resize", resize);
 resize();
 
-/* LOOP */
+/* =========================
+   LOOP
+========================= */
 function animate(time) {
   requestAnimationFrame(animate);
 
