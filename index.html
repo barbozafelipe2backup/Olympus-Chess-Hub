@@ -2,129 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Olympus Chess Hub v22 — Hybrid Core</title>
+<title>Olympus Multiplayer Engine</title>
 
 <style>
-html,body{
-  margin:0;
-  padding:0;
-  height:100%;
-  font-family:system-ui;
-  overflow:hidden;
-  background: radial-gradient(circle at top, #0a1a3a, #000);
-  color:white;
+html,body{margin:0;padding:0;overflow:hidden;background:#000;font-family:system-ui}
+#ui{
+  position:fixed;top:10px;left:10px;
+  color:#fff;background:rgba(0,0,0,.6);
+  padding:10px;border-radius:8px;font-size:12px;
 }
-
-.background{
-  position:absolute;
-  width:100%;
-  height:100%;
-  background:url("https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=1600&q=80");
-  background-size:cover;
-  opacity:0.25;
-  filter:blur(2px);
-}
-
-.center{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  width:360px;
-  background:rgba(0,0,40,0.75);
-  border:1px solid rgba(255,255,255,0.15);
-  padding:20px;
-  backdrop-filter: blur(10px);
-}
-
-h1{text-align:center;font-weight:300;letter-spacing:2px;}
-
-input{
-  width:100%;
-  padding:10px;
-  margin-top:8px;
-  border:none;
-  outline:none;
-  background:rgba(255,255,255,0.08);
-  color:white;
-}
-
-button{
-  width:100%;
-  margin-top:10px;
-  padding:10px;
-  border:none;
-  background:#1a73ff;
-  color:white;
-  cursor:pointer;
-}
-
-button:hover{background:#4aa3ff;}
-
-.small{
-  font-size:11px;
-  opacity:0.7;
-  text-align:center;
-  margin-top:8px;
-  cursor:pointer;
-}
-
-.screen{display:none;}
-.active{display:block;}
-
-.email-card{
-  background:rgba(0,0,60,0.9);
-  border:1px solid rgba(255,255,255,0.2);
-  padding:20px;
-  margin-top:10px;
-  font-size:12px;
-  white-space:pre-wrap;
-}
+button{margin-top:5px}
 </style>
 </head>
 
 <body>
 
-<div class="background"></div>
-
-<div class="center">
-
-<!-- LOGIN -->
-<div id="loginScreen" class="screen active">
-  <h1>OLYMPUS CHESS</h1>
-  <input id="email" placeholder="Email"/>
-  <input id="password" type="password" placeholder="Password"/>
-  <button onclick="login()">LOGIN</button>
-  <div class="small" onclick="switchScreen('registerScreen')">Create Account</div>
-  <div class="small" onclick="switchScreen('resetScreen')">Forgot Password</div>
+<div id="ui">
+  <div id="status">Connecting...</div>
+  <button id="create">Create Room</button>
+  <button id="join">Join Room</button>
 </div>
 
-<!-- REGISTER -->
-<div id="registerScreen" class="screen">
-  <h1>CREATE ACCOUNT</h1>
-  <input id="name" placeholder="Name"/>
-  <input id="regEmail" placeholder="Email"/>
-  <input id="regPass" type="password" placeholder="Password"/>
-  <button onclick="register()">CREATE</button>
-  <div class="small" onclick="switchScreen('loginScreen')">Back</div>
-</div>
+<canvas id="c"></canvas>
 
-<!-- RESET -->
-<div id="resetScreen" class="screen">
-  <h1>RESET PASSWORD</h1>
-  <input id="resetEmail" placeholder="Email"/>
-  <button onclick="resetPassword()">SEND</button>
-  <div class="small" onclick="switchScreen('loginScreen')">Back</div>
-</div>
-
-<!-- WELCOME -->
-<div id="welcomeScreen" class="screen">
-  <h1>WELCOME</h1>
-  <div id="emailBox" class="email-card"></div>
-  <button onclick="switchScreen('loginScreen')">BACK</button>
-</div>
-
-</div>
+<!-- THREE -->
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
 <!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -132,109 +35,178 @@ button:hover{background:#4aa3ff;}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* ---------------- FIREBASE INIT ---------------- */
+/* ================= FIREBASE ================= */
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDk6cG67wi5tRaFBMKRxfqVTzD37d00cvg",
+  authDomain: "olympus-chess-hub.firebaseapp.com",
+  projectId: "olympus-chess-hub",
+  storageBucket: "olympus-chess-hub.firebasestorage.app",
+  messagingSenderId: "554195593403",
+  appId: "1:554195593403:web:e2c7a2e202ad21d076219e"
 };
 
 firebase.initializeApp(firebaseConfig);
+
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ---------------- UI ---------------- */
-function $(id){ return document.getElementById(id); }
+let uid = null;
+let roomId = null;
+let color = null;
 
-function switchScreen(id){
-  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
-  $(id).classList.add("active");
+/* anonymous login */
+auth.signInAnonymously().then(u=>{
+  uid = u.user.uid;
+  document.getElementById("status").innerText = "Logged in: " + uid.slice(0,6);
+});
+
+/* ================= ENGINE ================= */
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({canvas});
+renderer.setSize(innerWidth,innerHeight);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111);
+
+const camera = new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,100);
+camera.position.set(4,8,10);
+
+const controls = new THREE.OrbitControls(camera,renderer.domElement);
+controls.target.set(4,0,4);
+controls.update();
+
+/* board */
+const board = new THREE.Group();
+const geo = new THREE.BoxGeometry(1,0.1,1);
+const light = new THREE.MeshStandardMaterial({color:0xb58863});
+const dark = new THREE.MeshStandardMaterial({color:0x6b4f3f});
+
+for(let r=0;r<8;r++){
+for(let c=0;c<8;c++){
+const m=new THREE.Mesh(geo,(r+c)%2?dark:light);
+m.position.set(c,0,r);
+board.add(m);
+}}
+scene.add(board);
+
+/* lighting */
+scene.add(new THREE.HemisphereLight(0xffffff,0x222,1));
+
+/* state */
+let pieces = {};
+let selected = null;
+
+/* chess init */
+function resetBoard(){
+pieces = {};
+for(let r=0;r<8;r++){
+for(let c=0;c<8;c++){
+const id = r+"-"+c;
+pieces[id] = null;
+}}}
+
+/* SIMPLE PIECE */
+function createPiece(color,x,z){
+const g = new THREE.Mesh(
+new THREE.CylinderGeometry(0.3,0.4,0.6,16),
+new THREE.MeshStandardMaterial({color:color==="w"?0xffffff:0x222222})
+);
+g.position.set(x,0.3,z);
+scene.add(g);
+return g;
 }
 
-function showEmail(text){
-  $("emailBox").innerText = text;
+/* ================= FIREBASE ROOM ================= */
+
+function createRoom(){
+roomId = Math.random().toString(36).substring(2,7);
+
+db.collection("rooms").doc(roomId).set({
+board:{},
+turn:"w",
+created:Date.now()
+});
+
+listenRoom();
+
+document.getElementById("status").innerText =
+"Room created: " + roomId;
 }
 
-/* ---------------- AUTH ---------------- */
+function joinRoom(){
+roomId = prompt("Enter room ID:");
+if(!roomId) return;
 
-async function register(){
-  const name = $("name").value;
-  const email = $("regEmail").value;
-  const pass = $("regPass").value;
+listenRoom();
 
-  try {
-    const cred = await auth.createUserWithEmailAndPassword(email, pass);
-
-    await db.collection("users").doc(cred.user.uid).set({
-      name,
-      email,
-      created: Date.now()
-    });
-
-    showEmail(
-`Welcome ${name},
-
-Your Olympus Chess Hub account is active.
-
-Email: ${email}
-
-— Olympus System`
-    );
-
-    switchScreen("welcomeScreen");
-
-    // OPTIONAL EMAILJS HOOK (if enabled)
-    sendEmail(name, email);
-
-  } catch(e){
-    alert(e.message);
-  }
+document.getElementById("status").innerText =
+"Joined room: " + roomId;
 }
 
-async function login(){
-  const email = $("email").value;
-  const pass = $("password").value;
+function listenRoom(){
+db.collection("rooms").doc(roomId)
+.onSnapshot(doc=>{
+const data = doc.data();
+if(!data) return;
 
-  try {
-    const cred = await auth.signInWithEmailAndPassword(email, pass);
-
-    const doc = await db.collection("users").doc(cred.user.uid).get();
-
-    showEmail(
-`Welcome back ${doc.data().name},
-
-System Status: ACTIVE
-Authentication: VERIFIED
-
-— Olympus Core`
-    );
-
-    switchScreen("welcomeScreen");
-
-  } catch(e){
-    alert("Login failed");
-  }
+renderFromState(data.board || {});
+});
 }
 
-async function resetPassword(){
-  const email = $("resetEmail").value;
+/* sync render */
+function renderFromState(state){
+Object.values(scene.children).forEach(o=>{
+if(o.isMesh && o.userData.piece) scene.remove(o);
+});
 
-  try {
-    await auth.sendPasswordResetEmail(email);
-    alert("Reset email sent");
-  } catch(e){
-    alert(e.message);
-  }
+for(const k in state){
+const p = state[k];
+if(p){
+const [r,c] = k.split("-").map(Number);
+const mesh = createPiece(p,c,r);
+mesh.userData.piece = true;
+}
+}
 }
 
-/* ---------------- OPTIONAL EMAILJS ---------------- */
-function sendEmail(name, email){
-  // requires EmailJS setup
-  // emailjs.send(SERVICE, TEMPLATE, {name, email});
-  console.log("Email trigger:", name, email);
+/* move */
+function sendMove(from,to,color){
+db.collection("rooms").doc(roomId).update({
+[`board.${from}`]: null,
+[`board.${to}`]: {color}
+});
 }
+
+/* click */
+window.addEventListener("click",e=>{
+if(!roomId) return;
+
+const x = Math.floor(Math.random()*8);
+const y = Math.floor(Math.random()*8);
+
+const from = x+"-"+y;
+const to = (x+1)+"-"+y;
+
+sendMove(from,to,"w");
+});
+
+/* buttons */
+document.getElementById("create").onclick=createRoom;
+document.getElementById("join").onclick=joinRoom;
+
+/* loop */
+function animate(){
+requestAnimationFrame(animate);
+renderer.render(scene,camera);
+}
+animate();
+
+window.addEventListener("resize",()=>{
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+});
+
 </script>
-
 </body>
 </html>
