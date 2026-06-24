@@ -1,445 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Olympus Chess — TRUE ECS CINEMATIC MULTIPLAYER</title>
-
+<meta charset="UTF-8" />
+<title>Olympus Chess — Simple 3D Board</title>
 <style>
-html,body{
-  margin:0;
-  height:100%;
-  overflow:hidden;
-  background:#000;
-}
-canvas{width:100%;height:100%;display:block;touch-action:none;}
-#ui{
-  position:fixed;
-  top:10px;
-  left:10px;
-  z-index:10;
-  color:#fff;
-  font-family:system-ui;
-  background:rgba(0,0,0,0.55);
-  padding:10px;
-  border-radius:10px;
-  font-size:12px;
-}
-button{font-size:12px;}
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background: #000;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
 </style>
 </head>
-
 <body>
-<div id="ui">
-  <button id="join">Join Match</button>
-  <div id="status">Offline</div>
-</div>
-
 <canvas id="c"></canvas>
 
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
-
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
 (() => {
+  const canvas = document.getElementById("c");
 
-/* ================= FIREBASE ================= */
-firebase.initializeApp({
-  apiKey:"YOUR_KEY",
-  authDomain:"YOUR_PROJECT.firebaseapp.com",
-  projectId:"YOUR_PROJECT"
-});
-
-const db = firebase.firestore();
-firebase.auth().signInAnonymously();
-const room = db.collection("rooms").doc("global");
-
-/* ================= GAME STATE ================= */
-const chess = new Chess();
-let player = null;
-let lastFen = null;
-let unsub = null;
-let moveLock = false;
-
-/* ================= ECS CORE ================= */
-
-const entities = new Map();   // id -> entity
-const meshes   = new Map();   // id -> mesh
-
-function createEntity(id,type,color,square){
-  return {
-    id,
-    type,
-    color,
-    square,   // algebraic: "e4"
-    alive:true
-  };
-}
-
-const ENTITIES = [];
-const back = ["r","n","b","q","k","b","n","r"];
-
-/* black: back rank 8, pawns 7 */
-for(let i=0;i<8;i++){
-  ENTITIES.push(createEntity(i, back[i], "b", String.fromCharCode(97+i)+"8"));
-}
-for(let i=0;i<8;i++){
-  ENTITIES.push(createEntity(8+i, "p", "b", String.fromCharCode(97+i)+"7"));
-}
-
-/* white: pawns 2, back rank 1 */
-for(let i=0;i<8;i++){
-  ENTITIES.push(createEntity(16+i, "p", "w", String.fromCharCode(97+i)+"2"));
-}
-for(let i=0;i<8;i++){
-  ENTITIES.push(createEntity(24+i, back[i], "w", String.fromCharCode(97+i)+"1"));
-}
-
-ENTITIES.forEach(e => entities.set(e.id,e));
-
-/* ================= THREE (CINEMATIC) ================= */
-
-const canvas   = document.getElementById("c");
-const renderer = new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
-renderer.setSize(innerWidth,innerHeight,false);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050608);
-scene.fog = new THREE.Fog(0x050608,12,30);
-
-const camera = new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,100);
-camera.position.set(6,14,14);
-
-const controls = new THREE.OrbitControls(camera,renderer.domElement);
-controls.enableDamping = true;
-controls.target.set(3.5,0,3.5);
-
-/* LIGHTING */
-const hemi = new THREE.HemisphereLight(0xffffff,0x111122,0.9);
-scene.add(hemi);
-
-const keyLight = new THREE.DirectionalLight(0xffffff,1.4);
-keyLight.position.set(10,18,8);
-keyLight.castShadow = true;
-scene.add(keyLight);
-
-const rimLight = new THREE.DirectionalLight(0x88aaff,0.4);
-rimLight.position.set(-8,10,-6);
-scene.add(rimLight);
-
-/* BOARD */
-const tiles = [];
-const boardGroup = new THREE.Group();
-scene.add(boardGroup);
-
-const boardBase = new THREE.Mesh(
-  new THREE.BoxGeometry(9,0.4,9),
-  new THREE.MeshStandardMaterial({
-    color:0x1b1e24,
-    roughness:0.8,
-    metalness:0.1
-  })
-);
-boardBase.position.set(3.5,-0.25,3.5);
-boardBase.receiveShadow = true;
-boardGroup.add(boardBase);
-
-for(let r=0;r<8;r++){
-  for(let c=0;c<8;c++){
-    const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(1,0.1,1),
-      new THREE.MeshStandardMaterial({
-        color:(r+c)%2 ? 0x3b2f2f : 0xc2a37a,
-        roughness:0.7,
-        metalness:0.05
-      })
-    );
-    tile.position.set(c,0,r);
-    tile.userData = {r,c};
-    tile.receiveShadow = true;
-    boardGroup.add(tile);
-    tiles.push(tile);
-  }
-}
-
-/* ================= PIECE MESHES ================= */
-
-function makeMesh(e){
-  const mat = new THREE.MeshStandardMaterial({
-    color: e.color === "w" ? 0xf5f5f5 : 0x222222,
-    roughness:0.4,
-    metalness:0.3
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    powerPreference: "high-performance"
   });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
 
-  let mesh;
-  switch(e.type){
-    case "p":
-      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.28,20,20),mat);
-      break;
-    case "r":
-      mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,0.7,20),mat);
-      break;
-    case "n":
-      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.35,0.7,0.35),mat);
-      break;
-    case "b":
-      mesh = new THREE.Mesh(new THREE.ConeGeometry(0.3,0.8,20),mat);
-      break;
-    case "q":
-      mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.38,0.38,0.85,24),mat);
-      break;
-    case "k":
-      mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.95,24),mat);
-      break;
-    default:
-      mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.6,16),mat);
-  }
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050608);
 
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  mesh.userData.tx = 0;
-  mesh.userData.tz = 0;
+  const camera = new THREE.PerspectiveCamera(
+    55,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
+  camera.position.set(6, 10, 12);
 
-  scene.add(mesh);
-  return mesh;
-}
-
-/* init meshes once */
-for(const e of entities.values()){
-  const m = makeMesh(e);
-  meshes.set(e.id,m);
-}
-
-/* ================= HELPERS ================= */
-
-function squareToXZ(square){
-  const file = square.charCodeAt(0) - 97;      // a-h -> 0-7
-  const rank = parseInt(square[1],10);         // 1-8
-  const x = file;
-  const z = 8 - rank;
-  return {x,z};
-}
-
-function applyEntityPositions(){
-  for(const e of entities.values()){
-    const m = meshes.get(e.id);
-    if(!m) continue;
-
-    if(e.alive && e.square){
-      const {x,z} = squareToXZ(e.square);
-      m.userData.tx = x;
-      m.userData.tz = z;
-      m.userData.hidden = false;
-    } else {
-      m.userData.hidden = true;
-    }
-  }
-}
-
-/* ================= ECS MOVE APPLICATION ================= */
-
-function applyMoveToEntities(move){
-  const from = move.from;
-  const to   = move.to;
-
-  // capture: find entity on "to" and mark dead
-  for(const e of entities.values()){
-    if(e.alive && e.square === to){
-      e.alive = false;
-      e.square = null;
-      break;
-    }
-  }
-
-  // moving piece: find entity on "from"
-  let mover = null;
-  for(const e of entities.values()){
-    if(e.alive && e.square === from){
-      mover = e;
-      break;
-    }
-  }
-  if(!mover) return;
-
-  // promotion: change type
-  if(move.promotion){
-    mover.type = move.promotion;
-    const oldMesh = meshes.get(mover.id);
-    if(oldMesh){
-      scene.remove(oldMesh);
-      meshes.delete(mover.id);
-    }
-    const newMesh = makeMesh(mover);
-    meshes.set(mover.id,newMesh);
-  }
-
-  // update square
-  mover.square = to;
-
-  applyEntityPositions();
-}
-
-/* ================= TWEEN ================= */
-
-function updateTweens(){
-  for(const m of meshes.values()){
-    if(m.userData.hidden){
-      m.position.y = -10;
-      continue;
-    }
-    m.position.x += (m.userData.tx - m.position.x) * 0.18;
-    m.position.z += (m.userData.tz - m.position.z) * 0.18;
-    m.position.y += ((0.35) - m.position.y) * 0.18;
-  }
-}
-
-/* ================= MOVE ================= */
-
-function sendMove(from,to){
-  if(moveLock) return;
-  if(player !== chess.turn()) return;
-
-  // simple auto-queen promotion for pawns reaching last rank
-  let promotion = undefined;
-  const fromRank = parseInt(from[1],10);
-  const toRank   = parseInt(to[1],10);
-  const piece = chess.get(from);
-  if(piece && piece.type === "p"){
-    if(piece.color === "w" && toRank === 8) promotion = "q";
-    if(piece.color === "b" && toRank === 1) promotion = "q";
-  }
-
-  const res = chess.move({from,to,promotion});
-  if(!res) return;
-
-  moveLock = true;
-
-  applyMoveToEntities(res);
-
-  const fen = chess.fen();
-  lastFen = fen;
-
-  room.update({
-    fen,
-    turn: chess.turn(),
-    lastMove:{
-      from: res.from,
-      to: res.to,
-      promotion: res.promotion || null
-    },
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }).finally(()=>{
-    moveLock = false;
-  });
-}
-
-/* ================= FIREBASE SYNC ================= */
-
-function listen(){
-  if(unsub) return;
-
-  unsub = room.onSnapshot(doc=>{
-    if(!doc.exists) return;
-
-    const data = doc.data();
-    if(!data?.fen || data.fen === lastFen) return;
-
-    lastFen = data.fen;
-    chess.load(data.fen);
-
-    if(data.lastMove){
-      applyMoveToEntities(data.lastMove);
-    } else {
-      // initial sync: just position entities from starting squares
-      applyEntityPositions();
-    }
-  });
-}
-
-/* ================= INPUT ================= */
-
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let selected = null;
-
-window.addEventListener("click",(e)=>{
-  mouse.x = (e.clientX/innerWidth)*2-1;
-  mouse.y = -(e.clientY/innerHeight)*2+1;
-
-  raycaster.setFromCamera(mouse,camera);
-
-  const hit = raycaster.intersectObjects(tiles)[0];
-  if(!hit) return;
-
-  const {r,c} = hit.object.userData;
-
-  if(!selected){
-    selected = {r,c};
-  } else {
-    const from = String.fromCharCode(97+selected.c)+(8-selected.r);
-    const to   = String.fromCharCode(97+c)+(8-r);
-    sendMove(from,to);
-    selected = null;
-  }
-});
-
-/* ================= JOIN ================= */
-
-async function join(){
-  if(unsub) return;
-
-  const snap = await room.get();
-
-  if(!snap.exists){
-    await room.set({
-      fen: chess.fen(),
-      turn:"w",
-      lastMove:null,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    player = "w";
-  } else {
-    const data = snap.data();
-    player = "b";
-    lastFen = data.fen;
-    chess.load(data.fen);
-  }
-
-  document.getElementById("status").innerText = "You: " + player;
-
-  applyEntityPositions();
-  listen();
-}
-
-/* ================= LOOP ================= */
-
-function animate(){
-  requestAnimationFrame(animate);
-  updateTweens();
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(3.5, 0, 3.5);
   controls.update();
-  renderer.render(scene,camera);
-}
-animate();
+  camera.lookAt(3.5, 0, 3.5);
 
-/* ================= RESIZE ================= */
+  // Lights
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 0.9);
+  scene.add(hemi);
 
-window.addEventListener("resize",()=>{
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight,false);
-});
+  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir.position.set(10, 15, 8);
+  scene.add(dir);
 
-/* START */
-document.getElementById("join").onclick = join;
+  // Board base
+  const boardBase = new THREE.Mesh(
+    new THREE.BoxGeometry(9, 0.4, 9),
+    new THREE.MeshStandardMaterial({ color: 0x1b1e24 })
+  );
+  boardBase.position.set(3.5, -0.25, 3.5);
+  scene.add(boardBase);
 
+  // Tiles
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const tile = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 0.1, 1),
+        new THREE.MeshStandardMaterial({
+          color: (r + c) % 2 ? 0x3b2f2f : 0xc2a37a
+        })
+      );
+      tile.position.set(c, 0, r);
+      scene.add(tile);
+    }
+  }
+
+  // One test piece in the center
+  const piece = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.3, 0.8, 24),
+    new THREE.MeshStandardMaterial({ color: 0xf5f5f5 })
+  );
+  piece.position.set(3.5, 0.5, 3.5);
+  scene.add(piece);
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+  });
 })();
 </script>
-
 </body>
 </html>
