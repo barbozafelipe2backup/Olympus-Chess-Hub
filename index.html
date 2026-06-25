@@ -1,270 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Olympus Neon Chess 3D</title>
-<style>
-html,body{
-    margin:0;
-    padding:0;
-    height:100%;
-    overflow:hidden;
-    background:#02040a;
-    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    color:#e8f3ff;
-}
-/* Layout */
-#app{
-    display:grid;
-    grid-template-columns:280px minmax(0,1fr) 280px;
-    grid-template-rows:60px minmax(0,1fr) 80px;
-    grid-template-areas:
-        "top top top"
-        "left center right"
-        "bottom bottom bottom";
-    height:100vh;
-}
-/* Top bar */
-#topbar{
-    grid-area:top;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:0 20px;
-    background:linear-gradient(90deg,#030712,#071426);
-    border-bottom:1px solid rgba(0,180,255,0.35);
-    box-shadow:0 0 24px rgba(0,180,255,0.35);
-    z-index: 10;
-}
-#topbar-title{
-    letter-spacing:0.18em;
-    text-transform:uppercase;
-    font-size:14px;
-    color:#7fd0ff;
-}
-#topbar-status{
-    font-size:13px;
-    color:#9fb7ff;
-}
-/* Left panel */
-#left-panel{
-    grid-area:left;
-    padding:16px;
-    background:radial-gradient(circle at top,#071426 0,#02040a 55%,#000000 100%);
-    border-right:1px solid rgba(0,180,255,0.25);
-    box-shadow:inset -12px 0 24px rgba(0,0,0,0.7);
-    display:flex;
-    flex-direction:column;
-    gap:16px;
-    z-index: 10;
-}
-/* Player card */
-.player-card{
-    padding:12px;
-    border-radius:14px;
-    background:linear-gradient(135deg,rgba(0,180,255,0.18),rgba(0,40,80,0.8));
-    border:1px solid rgba(0,180,255,0.45);
-    box-shadow:0 0 18px rgba(0,180,255,0.35);
-}
-.player-name{
-    font-size:14px;
-    text-transform:uppercase;
-    letter-spacing:0.12em;
-    color:#cfe9ff;
-}
-.player-elo{
-    font-size:12px;
-    color:#7fa6ff;
-    margin-bottom:6px;
-}
-.captured-box {
-    display: flex;
-    gap: 4px;
-    font-size: 14px;
-    min-height: 20px;
-    color: #7fd0ff;
-    text-shadow: 0 0 8px rgba(0,180,255,0.6);
-}
-/* God selector */
-#god-selector{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-}
-.god-btn{
-    flex:1 1 45%;
-    padding:8px 10px;
-    border-radius:999px;
-    border:1px solid rgba(0,180,255,0.4);
-    background:radial-gradient(circle at top,#041020,#02040a);
-    color:#cfe9ff;
-    font-size:12px;
-    text-transform:uppercase;
-    letter-spacing:0.08em;
-    cursor:pointer;
-    transition: all 0.2s ease;
-}
-.god-btn.active{
-    border-color:#7fd0ff;
-    box-shadow:0 0 16px rgba(0,180,255,0.8);
-    background:radial-gradient(circle at top,#0b2b4a,#02040a);
-}
-/* Center board */
-#center-panel{
-    grid-area:center;
-    position:relative;
-    background:#010206;
-    overflow: hidden;
-}
-#three-container {
-    width: 100%;
-    height: 100%;
-}
-/* Right panel */
-#right-panel{
-    grid-area:right;
-    padding:16px;
-    background:radial-gradient(circle at top,#071426 0,#02040a 55%,#000000 100%);
-    border-left:1px solid rgba(0,180,255,0.25);
-    box-shadow:inset 12px 0 24px rgba(0,0,0,0.7);
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-    z-index: 10;
-}
-/* Move list */
-#move-list{
-    flex:1;
-    padding:10px;
-    border-radius:14px;
-    background:linear-gradient(135deg,rgba(0,40,80,0.9),rgba(0,10,20,0.9));
-    border:1px solid rgba(0,180,255,0.35);
-    overflow-y:auto;
-    font-size:12px;
-}
-.move-row{
-    display:flex;
-    justify-content:space-between;
-    margin-bottom:6px;
-    color:#cfe9ff;
-    padding: 2px 4px;
-}
-.move-index{
-    color:#7fa6ff;
-    width: 25px;
-}
-/* Bottom bar */
-#bottom-bar{
-    grid-area:bottom;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:0 20px;
-    background:linear-gradient(90deg,#030712,#071426);
-    border-top:1px solid rgba(0,180,255,0.35);
-    box-shadow:0 -12px 24px rgba(0,0,0,0.8);
-    z-index: 10;
-}
-.bottom-left{
-    display:flex;
-    gap:10px;
-}
-.bottom-right{
-    display:flex;
-    gap:10px;
-}
-/* Buttons */
-.btn{
-    padding:8px 14px;
-    border-radius:999px;
-    border:1px solid rgba(0,180,255,0.5);
-    background:radial-gradient(circle at top,#041020,#02040a);
-    color:#cfe9ff;
-    font-size:12px;
-    text-transform:uppercase;
-    letter-spacing:0.08em;
-    cursor:pointer;
-    transition: all 0.2s ease;
-}
-.btn-primary{
-    background:linear-gradient(135deg,#00b4ff,#0070ff);
-    border-color:#7fd0ff;
-    box-shadow:0 0 18px rgba(0,180,255,0.8);
-}
-.btn:hover{
-    border-color: #7fd0ff;
-    box-shadow: 0 0 10px rgba(0,180,255,0.4);
-}
-.btn:active{
-    transform:scale(0.97);
-}
-#move-list::-webkit-scrollbar{
-    width:6px;
-}
-#move-list::-webkit-scrollbar-track{
-    background:#02040a;
-}
-#move-list::-webkit-scrollbar-thumb{
-    background:#0070ff;
-    border-radius:999px;
-}
-</style>
+    <title>Olympus Chess 3D</title>
+    <style>body { margin: 0; overflow: hidden; background: #050505; }</style>
 </head>
 <body>
-<div id="app">
-    <!-- TOP BAR -->
-    <div id="topbar">
-        <div id="topbar-title">OLYMPUS NEON CHESS 3D</div>
-        <div id="topbar-status">TURN: BLUE • GOD MODE ACTIVE • ROOM: #NEON-001</div>
-    </div>
-    <!-- LEFT PANEL -->
-    <div id="left-panel">
-        <div class="player-card">
-            <div class="player-name">PLAYER ONE</div>
-            <div class="player-elo">ELO 2100 • BLUE SIDE</div>
-            <div class="captured-box" id="captured-dark"></div>
-        </div>
-        <div class="player-card">
-            <div class="player-name">PLAYER TWO</div>
-            <div class="player-elo">ELO 2050 • DARK SIDE</div>
-            <div class="captured-box" id="captured-blue"></div>
-        </div>
-        <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.12em; color:#7fd0ff; margin-top:4px;">
-            Gods Aura
-        </div>
-        <div id="god-selector">
-            <button class="god-btn active" data-god="zeus">Zeus</button>
-            <button class="god-btn" data-god="poseidon">Poseidon</button>
-            <button class="god-btn" data-god="hades">Hades</button>
-            <button class="god-btn" data-god="athena">Athena</button>
-            <button class="god-btn" data-god="hera">Hera</button>
-        </div>
-    </div>
-    <!-- CENTER PANEL -->
-    <div id="center-panel">
-        <div id="three-container"></div>
-    </div>
-    <!-- RIGHT PANEL -->
-    <div id="right-panel">
-        <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.12em; color:#7fd0ff;">
-            Move history
-        </div>
-        <div id="move-list"></div>
-    </div>
-    <!-- BOTTOM BAR -->
-    <div id="bottom-bar">
-        <div class="bottom-left">
-            <button class="btn" id="btn-god-effect">Trigger God Effect</button>
-            <button class="btn" id="btn-reset">Reset Board</button>
-        </div>
-        <div class="bottom-right">
-            <button class="btn" id="btn-create-room">Create Room</button>
-            <button class="btn btn-primary" id="btn-start-game">Start Game</button>
-        </div>
-    </div>
-</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Setup Scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-<script type="module">
-import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-import
+        // Board
+        const geometry = new THREE.BoxGeometry(8, 0.5, 8);
+        const material = new THREE.MeshPhongMaterial({ color: 0x222222 });
+        const board = new THREE.Mesh(geometry, material);
+        scene.add(board);
+
+        // Lighting
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 5, 5);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        camera.position.set(0, 8, 10);
+        camera.lookAt(0, 0, 0);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
