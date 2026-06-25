@@ -2,436 +2,456 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Olympus Chess Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Olympus Chess V30 — Gods 3D</title>
 
 <style>
 html,body{
   margin:0;
   height:100%;
-  background:#050608;
-  color:#fff;
-  font-family:system-ui;
   overflow:hidden;
+  background:#05060a;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#e6ecff;
 }
-.screen{
-  position:absolute;
-  inset:0;
-  display:none;
+#ui{
+  position:fixed;
+  top:10px;
+  left:10px;
+  z-index:10;
+  background:rgba(5,6,10,0.85);
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:0 0 20px rgba(0,0,0,0.7);
+  font-size:12px;
+  max-width:260px;
 }
-.screen.active{display:flex;}
-
-#menu{
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:18px;
-  background:radial-gradient(circle at top,#10244d,#050608 70%);
+#title{
+  font-size:14px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  margin-bottom:6px;
 }
-#menu h1{
-  font-size:56px;
-  margin:0;
-  letter-spacing:4px;
+#god-label{
+  margin-bottom:6px;
 }
-.btn{
-  width:260px;
-  padding:16px;
-  border-radius:14px;
-  border:1px solid #3a4d7a;
-  background:#11224a;
-  color:#fff;
-  font-size:18px;
+.god-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  margin-bottom:6px;
+}
+.god-btn{
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.15);
+  background:#101522;
+  color:#e6ecff;
+  cursor:pointer;
+  font-size:11px;
+}
+.god-btn.active{
+  border-color:#ffd86c;
+  box-shadow:0 0 10px rgba(255,216,108,0.4);
+}
+button{
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.15);
+  background:#101522;
+  color:#e6ecff;
   cursor:pointer;
 }
-
-#game{
-  flex-direction:row;
+button:hover{
+  border-color:#ffd86c;
 }
-#leftPanel{
-  width:260px;
-  background:#0b0f17;
-  padding:12px;
-  box-sizing:border-box;
-  overflow:auto;
+#status{
+  margin-top:6px;
+  opacity:0.8;
 }
-#boardWrap{
-  flex:1;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-#board{
-  width:min(88vmin,760px);
-  height:min(88vmin,760px);
-  display:grid;
-  grid-template-columns:repeat(8,1fr);
-  border:4px solid #333;
-}
-.square{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:clamp(28px,5vmin,52px);
-  user-select:none;
-}
-.light{background:#c2a37a;}
-.dark{background:#3b2f2f;}
-.selected{outline:4px solid #00aaff;}
-.move{box-shadow:inset 0 0 0 4px #00ff99;}
-
-.panelTitle{
-  font-weight:bold;
-  margin:10px 0 6px;
-}
-.moveList{
-  max-height:240px;
-  overflow:auto;
-  font-size:14px;
-  line-height:1.5;
-}
-.clock{
-  background:#121826;
-  padding:10px;
-  border-radius:10px;
-  margin:8px 0;
-  font-size:28px;
-  text-align:center;
-}
-.captured{
-  min-height:40px;
-  font-size:24px;
-  line-height:1.6;
-  word-wrap:break-word;
-}
-.back{
-  margin-top:10px;
-  width:100%;
-}
-
-#olympus,#settings{
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:20px;
-  background:linear-gradient(180deg,#0b1020,#050608);
-}
-.card{
-  width:min(92vw,560px);
-  background:#0f1526;
-  border:1px solid #26324d;
-  border-radius:18px;
-  padding:20px;
-  box-sizing:border-box;
-}
-.gods{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-  gap:14px;
-}
-.god{
-  background:#111827;
-  border:1px solid #2a395a;
-  border-radius:14px;
-  padding:16px;
-  text-align:center;
-}
-.settingRow{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin:12px 0;
-}
-select{
-  background:#0b1220;
-  color:#fff;
-  border:1px solid #2a395a;
-  border-radius:8px;
-  padding:8px;
+canvas{
+  display:block;
+  width:100vw;
+  height:100vh;
 }
 </style>
 </head>
+
 <body>
+<div id="ui">
+  <div id="title">OLYMPUS CHESS — GOD MODE</div>
+  <div id="god-label">Current God:</div>
+  <div id="god-name">Zeus — Lord of Lightning</div>
 
-<!-- MAIN MENU -->
-<div id="menu" class="screen active">
-  <h1>OLYMPUS</h1>
-  <button class="btn" onclick="show('game')">Start Game</button>
-  <button class="btn" onclick="alert('Multiplayer comes in Option B')">Multiplayer</button>
-  <button class="btn" onclick="show('olympus')">Olympus Mode</button>
-  <button class="btn" onclick="show('settings')">Settings</button>
-</div>
-
-<!-- GAME -->
-<div id="game" class="screen">
-  <div id="leftPanel">
-    <div class="panelTitle">Turn</div>
-    <div id="turnText">White</div>
-
-    <div class="panelTitle">White</div>
-    <div id="whiteClock" class="clock">05:00</div>
-
-    <div class="panelTitle">Black</div>
-    <div id="blackClock" class="clock">05:00</div>
-
-    <div class="panelTitle">Captured White</div>
-    <div id="capWhite" class="captured"></div>
-
-    <div class="panelTitle">Captured Black</div>
-    <div id="capBlack" class="captured"></div>
-
-    <div class="panelTitle">Moves</div>
-    <div id="moveList" class="moveList"></div>
-
-    <button class="btn back" onclick="show('menu')">Exit</button>
+  <div class="god-row">
+    <button class="god-btn active" data-god="zeus">Zeus</button>
+    <button class="god-btn" data-god="poseidon">Poseidon</button>
+    <button class="god-btn" data-god="hades">Hades</button>
+    <button class="god-btn" data-god="athena">Athena</button>
+    <button class="god-btn" data-god="hera">Hera</button>
   </div>
 
-  <div id="boardWrap">
-    <div id="board"></div>
-  </div>
+  <button id="strike">God Effect</button>
+  <div id="status">Tap squares to move pieces. Pieces change with the god you pick.</div>
 </div>
 
-<!-- OLYMPUS MODE -->
-<div id="olympus" class="screen">
-  <div class="card">
-    <h2>Olympus Mode</h2>
-    <p>Select a god for your match.</p>
-    <div class="gods">
-      <div class="god">
-        <div style="font-size:42px">⚡</div>
-        <div><b>Zeus</b></div>
-        <div style="font-size:13px;color:#b9c2d0">Lightning strike</div>
-      </div>
-      <div class="god">
-        <div style="font-size:42px">🌊</div>
-        <div><b>Poseidon</b></div>
-        <div style="font-size:13px;color:#b9c2d0">Tidal force</div>
-      </div>
-      <div class="god">
-        <div style="font-size:42px">💀</div>
-        <div><b>Hades</b></div>
-        <div style="font-size:13px;color:#b9c2d0">Shadow realm</div>
-      </div>
-    </div>
-    <button class="btn back" onclick="show('menu')">Back</button>
-  </div>
-</div>
+<canvas id="c"></canvas>
 
-<!-- SETTINGS -->
-<div id="settings" class="screen">
-  <div class="card">
-    <h2>Settings</h2>
+<!-- THREE.JS -->
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
-    <div class="settingRow">
-      <span>Board Theme</span>
-      <select id="themeSelect" onchange="applyTheme()">
-        <option value="classic">Classic</option>
-        <option value="dark">Dark</option>
-        <option value="neon">Neon</option>
-      </select>
-    </div>
+<!-- FIREBASE (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <div class="settingRow">
-      <span>Sound</span>
-      <span>On</span>
-    </div>
-
-    <div class="settingRow">
-      <span>Animations</span>
-      <span>On</span>
-    </div>
-
-    <button class="btn back" onclick="show('menu')">Back</button>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
 <script>
-const screens=document.querySelectorAll('.screen');
-function show(id){
-  screens.forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-const boardEl=document.getElementById('board');
-const moveListEl=document.getElementById('moveList');
-const turnText=document.getElementById('turnText');
-const capWhite=document.getElementById('capWhite');
-const capBlack=document.getElementById('capBlack');
-
-const chess=new Chess();
-let selected=null;
-
-const pieces={
-  wp:'♙',wr:'♖',wn:'♘',wb:'♗',wq:'♕',wk:'♔',
-  bp:'♟',br:'♜',bn:'♞',bb:'♝',bq:'♛',bk:'♚'
+/* ================= FIREBASE ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDk6cG67wi5tRaFBMKRxfqVTzD37d00cvg",
+  authDomain: "olympus-chess-hub.firebaseapp.com",
+  projectId: "olympus-chess-hub",
+  storageBucket: "olympus-chess-hub.firebasestorage.app",
+  messagingSenderId: "554195593403",
+  appId: "1:554195593403:web:e2c7a2e202ad21d076219e",
+  measurementId: "G-WVBLXLQD50"
 };
 
-function squareName(r,c){
-  return String.fromCharCode(97+c)+(8-r);
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+auth.signInAnonymously().catch(console.error);
+
+/* ================= CORE STATE ================= */
+const startPos = [
+  "r","n","b","q","k","b","n","r",
+  "p","p","p","p","p","p","p","p",
+  "","","","","","","","",
+  "","","","","","","","",
+  "","","","","","","","",
+  "","","","","","","","",
+  "P","P","P","P","P","P","P","P",
+  "R","N","B","Q","K","B","N","R"
+];
+let board = [...startPos];
+let selected = null;
+let currentGod = "zeus";
+
+/* ================= THREE SETUP ================= */
+const canvas   = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias:true,
+  powerPreference:"high-performance"
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.setSize(window.innerWidth,window.innerHeight,false);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060a);
+scene.fog = new THREE.Fog(0x05060a,14,40);
+
+const camera = new THREE.PerspectiveCamera(
+  55,
+  window.innerWidth/window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(6,14,14);
+
+const controls = new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(3.5,0,3.5);
+controls.update();
+
+/* ================= LIGHTING ================= */
+const hemi = new THREE.HemisphereLight(0xfff7e0,0x111118,0.9);
+scene.add(hemi);
+
+const keyLight = new THREE.DirectionalLight(0xfff1c2,1.4);
+keyLight.position.set(10,18,8);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024,1024);
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(0x88aaff,0.6);
+rimLight.position.set(-8,10,-6);
+scene.add(rimLight);
+
+const godLight = new THREE.PointLight(0xffffff,0,20,2);
+godLight.position.set(3.5,8,3.5);
+scene.add(godLight);
+
+/* ================= BOARD ================= */
+const boardGroup = new THREE.Group();
+scene.add(boardGroup);
+
+const boardBase = new THREE.Mesh(
+  new THREE.BoxGeometry(9,0.5,9),
+  new THREE.MeshStandardMaterial({
+    color:0x2b2520,
+    roughness:0.5,
+    metalness:0.3
+  })
+);
+boardBase.position.set(3.5,-0.25,3.5);
+boardBase.receiveShadow = true;
+boardGroup.add(boardBase);
+
+const tiles = [];
+for(let r=0;r<8;r++){
+  for(let c=0;c<8;c++){
+    const tile = new THREE.Mesh(
+      new THREE.BoxGeometry(1,0.12,1),
+      new THREE.MeshStandardMaterial({
+        color:(r+c)%2===0 ? 0xf7e3b0 : 0x3b2f2f,
+        roughness:0.3,
+        metalness:0.4
+      })
+    );
+    tile.position.set(c,0,r);
+    tile.receiveShadow = true;
+    tile.userData = {r,c};
+    boardGroup.add(tile);
+    tiles.push(tile);
+  }
 }
 
-function renderBoard(){
-  boardEl.innerHTML='';
+/* ================= PIECES ================= */
+const meshes = new Map();
 
-  for(let r=0;r<8;r++){
-    for(let c=0;c<8;c++){
-      const sq=squareName(r,c);
-      const piece=chess.get(sq);
+function getGodMaterial(color, god){
+  switch(god){
+    case "zeus":
+      return new THREE.MeshStandardMaterial({
+        color: color === "w" ? 0xfff6d0 : 0x2b2620,
+        metalness: 0.85,
+        roughness: 0.25,
+        emissive: color === "w" ? 0xffe06c : 0x000000,
+        emissiveIntensity: color === "w" ? 0.35 : 0.08
+      });
+    case "poseidon":
+      return new THREE.MeshStandardMaterial({
+        color: color === "w" ? 0xcceeff : 0x0a1a2a,
+        metalness: 0.7,
+        roughness: 0.3,
+        emissive: color === "w" ? 0x4cc7ff : 0x003344,
+        emissiveIntensity: color === "w" ? 0.45 : 0.15
+      });
+    case "hades":
+      return new THREE.MeshStandardMaterial({
+        color: color === "w" ? 0xdddddd : 0x000000,
+        metalness: 0.9,
+        roughness: 0.2,
+        emissive: color === "w" ? 0x550000 : 0x220000,
+        emissiveIntensity: color === "w" ? 0.15 : 0.45
+      });
+    case "athena":
+      return new THREE.MeshStandardMaterial({
+        color: color === "w" ? 0xffffff : 0x222222,
+        metalness: 0.95,
+        roughness: 0.15,
+        emissive: color === "w" ? 0xffd27f : 0x000000,
+        emissiveIntensity: color === "w" ? 0.25 : 0.05
+      });
+    case "hera":
+      return new THREE.MeshStandardMaterial({
+        color: color === "w" ? 0xffe6f2 : 0x2a0f1f,
+        metalness: 0.85,
+        roughness: 0.25,
+        emissive: color === "w" ? 0xcc66ff : 0x330044,
+        emissiveIntensity: color === "w" ? 0.35 : 0.2
+      });
+  }
+}
 
-      const d=document.createElement('div');
-      d.className='square '+((r+c)%2?'dark':'light');
-      d.dataset.sq=sq;
+function makeGodPiece(type,color,god){
+  const mat = getGodMaterial(color,god);
+  let mesh;
+  switch(type){
+    case "p": mesh = new THREE.Mesh(new THREE.SphereGeometry(0.35,32,32),mat); break;
+    case "r": mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,1.1,32),mat); break;
+    case "n": mesh = new THREE.Mesh(new THREE.TorusKnotGeometry(0.35,0.12,80,16),mat); break;
+    case "b": mesh = new THREE.Mesh(new THREE.ConeGeometry(0.38,1.4,32),mat); break;
+    case "q": mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,1.5,32),mat); break;
+    case "k": mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.7,32),mat); break;
+  }
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.tx = 0;
+  mesh.userData.tz = 0;
+  mesh.userData.hidden = false;
+  scene.add(mesh);
+  return mesh;
+}
 
-      if(selected===sq) d.classList.add('selected');
+function indexToSquare(i){
+  const row = Math.floor(i/8);
+  const col = i%8;
+  const file = String.fromCharCode(97+col);
+  const rank = 8-row;
+  return file+rank;
+}
+function squareToXZ(square){
+  const file = square.charCodeAt(0)-97;
+  const rank = parseInt(square[1],10);
+  const x = file;
+  const z = 8-rank;
+  return {x,z};
+}
 
-      const moves=selected
-        ? chess.moves({square:selected,verbose:true}).map(m=>m.to)
-        : [];
+function initPieces(){
+  // clear old
+  for(const m of meshes.values()) scene.remove(m);
+  meshes.clear();
 
-      if(moves.includes(sq)) d.classList.add('move');
+  for(let i=0;i<64;i++){
+    if(!board[i]) continue;
+    const pieceChar = board[i];
+    const type = pieceChar.toLowerCase();
+    const color = pieceChar === pieceChar.toUpperCase() ? "w" : "b";
+    const mesh = makeGodPiece(type,color,currentGod);
+    const sq = indexToSquare(i);
+    const {x,z} = squareToXZ(sq);
+    mesh.position.set(x,0.35,z);
+    mesh.userData.tx = x;
+    mesh.userData.tz = z;
+    meshes.set(i,mesh);
+  }
+}
+initPieces();
 
-      if(piece){
-        d.textContent=pieces[piece.color+piece.type];
-      }
-
-      d.onclick=()=>clickSquare(sq);
-
-      boardEl.appendChild(d);
+/* ================= ANIMATION ================= */
+function updateTweens(){
+  for(const mesh of meshes.values()){
+    if(mesh.userData.hidden){
+      mesh.position.y += (-5 - mesh.position.y)*0.2;
+      continue;
     }
+    mesh.position.x += (mesh.userData.tx - mesh.position.x)*0.18;
+    mesh.position.z += (mesh.userData.tz - mesh.position.z)*0.18;
+    mesh.position.y += (0.35 - mesh.position.y)*0.18;
   }
-
-  turnText.textContent=chess.turn()==='w'?'White':'Black';
-  updateMoves();
 }
 
-function clickSquare(sq){
-  const piece=chess.get(sq);
+/* ================= INPUT ================= */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
-  if(!selected){
-    if(piece && piece.color===chess.turn()){
-      selected=sq;
-      renderBoard();
+window.addEventListener("click",(e)=>{
+  mouse.x = (e.clientX/window.innerWidth)*2-1;
+  mouse.y = -(e.clientY/window.innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hit = raycaster.intersectObjects(tiles)[0];
+  if(!hit) return;
+  const {r,c} = hit.object.userData;
+  const i = r*8 + c;
+  handleClick(i);
+});
+
+function handleClick(i){
+  if(selected === null){
+    if(board[i]){
+      selected = i;
+      document.getElementById("status").textContent = "Selected " + indexToSquare(i);
     }
-    return;
+  } else {
+    movePiece(selected,i);
+    selected = null;
+  }
+}
+
+/* ================= MOVE LOGIC (simple) ================= */
+function movePiece(from,to){
+  if(from === to) return;
+  if(!board[from]) return;
+
+  board[to] = board[from];
+  board[from] = "";
+
+  const meshFrom = meshes.get(from);
+  if(meshFrom){
+    const sqTo = indexToSquare(to);
+    const {x,z} = squareToXZ(sqTo);
+    meshFrom.userData.tx = x;
+    meshFrom.userData.tz = z;
+    meshes.set(to,meshFrom);
+    meshes.delete(from);
   }
 
-  if(selected===sq){
-    selected=null;
-    renderBoard();
-    return;
+  const meshCap = meshes.get(to);
+  if(meshCap && meshCap !== meshFrom){
+    meshCap.userData.hidden = true;
   }
 
-  const move=chess.move({
-    from:selected,
-    to:sq,
-    promotion:'q'
-  });
+  document.getElementById("status").textContent = "Moved to " + indexToSquare(to);
+}
 
-  if(move){
-    selected=null;
-    renderBoard();
-    updateCaptured();
-  }else{
-    if(piece && piece.color===chess.turn()){
-      selected=sq;
-    }else{
-      selected=null;
+/* ================= GOD EFFECT ================= */
+function godEffect(){
+  let color;
+  switch(currentGod){
+    case "zeus": color = 0xfff6a0; break;
+    case "poseidon": color = 0x4cc7ff; break;
+    case "hades": color = 0xff3333; break;
+    case "athena": color = 0xffd27f; break;
+    case "hera": color = 0xcc66ff; break;
+  }
+  godLight.color.setHex(color);
+  godLight.intensity = 0;
+  let t = 0;
+  const interval = setInterval(()=>{
+    t += 1;
+    godLight.intensity = (t%2===0) ? 0 : 20;
+    if(t>6){
+      godLight.intensity = 0;
+      clearInterval(interval);
     }
-    renderBoard();
-  }
+  },80);
+}
+document.getElementById("strike").onclick = godEffect;
+
+/* ================= GOD SELECTION UI ================= */
+const godButtons = document.querySelectorAll(".god-btn");
+const godNameEl = document.getElementById("god-name");
+
+function setGod(g){
+  currentGod = g;
+  godButtons.forEach(b=>b.classList.toggle("active", b.dataset.god===g));
+  let label = "";
+  if(g==="zeus") label = "Zeus — Lord of Lightning";
+  if(g==="poseidon") label = "Poseidon — Lord of the Seas";
+  if(g==="hades") label = "Hades — Lord of Shadows";
+  if(g==="athena") label = "Athena — Goddess of Wisdom";
+  if(g==="hera") label = "Hera — Queen of the Gods";
+  godNameEl.textContent = label;
+  document.getElementById("status").textContent = "God set to " + g + ". Pieces re‑themed.";
+  initPieces();
 }
 
-function updateMoves(){
-  const hist=chess.history();
-  let html='';
+godButtons.forEach(btn=>{
+  btn.addEventListener("click",()=>setGod(btn.dataset.god));
+});
 
-  for(let i=0;i<hist.length;i+=2){
-    const w=hist[i]||'';
-    const b=hist[i+1]||'';
-    html+=`<div>${i/2+1}. ${w} ${b}</div>`;
-  }
-
-  moveListEl.innerHTML=html;
-  moveListEl.scrollTop=moveListEl.scrollHeight;
+/* ================= LOOP ================= */
+function animate(){
+  requestAnimationFrame(animate);
+  updateTweens();
+  controls.update();
+  renderer.render(scene,camera);
 }
+animate();
 
-function updateCaptured(){
-  const start={
-    p:8,r:2,n:2,b:2,q:1,k:1
-  };
-
-  const current={
-    w:{p:0,r:0,n:0,b:0,q:0,k:0},
-    b:{p:0,r:0,n:0,b:0,q:0,k:0}
-  };
-
-  chess.board().flat().forEach(p=>{
-    if(p) current[p.color][p.type]++;
-  });
-
-  let whiteCaps='';
-  let blackCaps='';
-
-  for(const t in start){
-    const missingBlack=start[t]-current.b[t];
-    const missingWhite=start[t]-current.w[t];
-
-    for(let i=0;i<missingBlack;i++){
-      whiteCaps+=pieces['b'+t]+' ';
-    }
-    for(let i=0;i<missingWhite;i++){
-      blackCaps+=pieces['w'+t]+' ';
-    }
-  }
-
-  capWhite.textContent=whiteCaps;
-  capBlack.textContent=blackCaps;
-}
-
-/* CLOCKS */
-let whiteTime=300;
-let blackTime=300;
-
-function fmt(t){
-  const m=Math.floor(t/60);
-  const s=t%60;
-  return String(m).padStart(2,'0')+':' + String(s).padStart(2,'0');
-}
-
-function tick(){
-  if(document.getElementById('game').classList.contains('active')){
-    if(chess.turn()==='w'){
-      whiteTime=Math.max(0,whiteTime-1);
-    }else{
-      blackTime=Math.max(0,blackTime-1);
-    }
-
-    document.getElementById('whiteClock').textContent=fmt(whiteTime);
-    document.getElementById('blackClock').textContent=fmt(blackTime);
-  }
-}
-setInterval(tick,1000);
-
-/* THEMES */
-function applyTheme(){
-  const t=document.getElementById('themeSelect').value;
-
-  document.querySelectorAll('.light').forEach(s=>{
-    s.style.background=
-      t==='classic' ? '#c2a37a' :
-      t==='dark'    ? '#6b6b6b' :
-                      '#0b2b3a';
-  });
-
-  document.querySelectorAll('.dark').forEach(s=>{
-    s.style.background=
-      t==='classic' ? '#3b2f2f' :
-      t==='dark'    ? '#2b2b2b' :
-                      '#04151d';
-  });
-}
-
-renderBoard();
+window.addEventListener("resize",()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight,false);
+});
 </script>
 </body>
 </html>
