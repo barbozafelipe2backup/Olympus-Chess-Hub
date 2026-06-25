@@ -1,457 +1,862 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Olympus Chess V30 — Gods 3D</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Olympus Neon Chess</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-<style>
-html,body{
-  margin:0;
-  height:100%;
-  overflow:hidden;
-  background:#05060a;
-  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  color:#e6ecff;
-}
-#ui{
-  position:fixed;
-  top:10px;
-  left:10px;
-  z-index:10;
-  background:rgba(5,6,10,0.85);
-  padding:10px 12px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,0.08);
-  box-shadow:0 0 20px rgba(0,0,0,0.7);
-  font-size:12px;
-  max-width:260px;
-}
-#title{
-  font-size:14px;
-  letter-spacing:0.12em;
-  text-transform:uppercase;
-  margin-bottom:6px;
-}
-#god-label{
-  margin-bottom:6px;
-}
-.god-row{
-  display:flex;
-  flex-wrap:wrap;
-  gap:4px;
-  margin-bottom:6px;
-}
-.god-btn{
-  padding:4px 8px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,0.15);
-  background:#101522;
-  color:#e6ecff;
-  cursor:pointer;
-  font-size:11px;
-}
-.god-btn.active{
-  border-color:#ffd86c;
-  box-shadow:0 0 10px rgba(255,216,108,0.4);
-}
-button{
-  font-size:12px;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,0.15);
-  background:#101522;
-  color:#e6ecff;
-  cursor:pointer;
-}
-button:hover{
-  border-color:#ffd86c;
-}
-#status{
-  margin-top:6px;
-  opacity:0.8;
-}
-canvas{
-  display:block;
-  width:100vw;
-  height:100vh;
-}
-</style>
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: #02040a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e8f3ff;
+    }
+
+    /* GRID LAYOUT */
+    #app {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) 280px;
+      grid-template-rows: 60px minmax(0, 1fr) 80px;
+      grid-template-areas:
+        "top top top"
+        "left center right"
+        "bottom bottom bottom";
+      height: 100vh;
+    }
+
+    /* TOP BAR */
+    #topbar {
+      grid-area: top;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      background: linear-gradient(90deg, #030712, #071426);
+      border-bottom: 1px solid rgba(0, 180, 255, 0.35);
+      box-shadow: 0 0 24px rgba(0, 180, 255, 0.35);
+    }
+
+    #topbar-title {
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-size: 14px;
+      color: #7fd0ff;
+      font-weight: 600;
+    }
+
+    #topbar-status {
+      font-size: 12px;
+      color: #9fb7ff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #00ff88;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* LEFT PANEL */
+    #left-panel {
+      grid-area: left;
+      padding: 16px;
+      background: radial-gradient(circle at top, #071426 0%, #02040a 55%, #000000 100%);
+      border-right: 1px solid rgba(0, 180, 255, 0.25);
+      box-shadow: inset -12px 0 24px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+
+    .panel-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #7fa6ff;
+      opacity: 0.7;
+      margin-bottom: 4px;
+    }
+
+    /* PLAYER CARDS */
+    .player-card {
+      padding: 12px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(0, 180, 255, 0.18), rgba(0, 40, 80, 0.8));
+      border: 1px solid rgba(0, 180, 255, 0.45);
+      box-shadow: 0 0 18px rgba(0, 180, 255, 0.35);
+    }
+
+    .player-card.active {
+      box-shadow: 0 0 32px rgba(0, 180, 255, 0.8);
+    }
+
+    .player-name {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #cfe9ff;
+      font-weight: 600;
+    }
+
+    .player-elo {
+      font-size: 11px;
+      color: #7fa6ff;
+      margin-top: 2px;
+    }
+
+    .player-time {
+      font-size: 16px;
+      font-family: 'Monaco', monospace;
+      color: #00d9ff;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    /* GOD SELECTOR */
+    .panel-label {
+      margin-top: 10px;
+    }
+
+    #god-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .god-btn {
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 180, 255, 0.4);
+      background: radial-gradient(circle at top, #041020, #02040a);
+      color: #cfe9ff;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .god-btn:hover {
+      border-color: #7fd0ff;
+      box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+    }
+
+    .god-btn.active {
+      border-color: #7fd0ff;
+      box-shadow: 0 0 20px rgba(0, 180, 255, 0.8);
+      background: radial-gradient(circle at top, #0b2b4a, #02040a);
+    }
+
+    /* MOVE LIST */
+    .panel-label {
+      margin-top: 10px;
+    }
+
+    #move-list {
+      flex: 1;
+      padding: 10px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(0, 40, 80, 0.9), rgba(0, 10, 20, 0.9));
+      border: 1px solid rgba(0, 180, 255, 0.35);
+      overflow-y: auto;
+      font-size: 11px;
+      font-family: 'Monaco', monospace;
+    }
+
+    .move-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      color: #cfe9ff;
+    }
+
+    .move-index {
+      color: #7fa6ff;
+      min-width: 20px;
+    }
+
+    /* CENTER PANEL - BOARD */
+    #center-panel {
+      grid-area: center;
+      position: relative;
+      background: radial-gradient(circle at center, #050b18 0%, #02040a 55%, #000000 100%);
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+      overflow: hidden;
+      margin: 20px;
+    }
+
+    #center-frame {
+      position: absolute;
+      inset: 0;
+      border-radius: 24px;
+      border: 1px solid rgba(0, 180, 255, 0.45);
+      box-shadow:
+        0 0 40px rgba(0, 180, 255, 0.45),
+        inset 0 0 40px rgba(0, 40, 80, 0.4);
+      pointer-events: none;
+    }
+
+    #game-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+    }
+
+    /* RIGHT PANEL */
+    #right-panel {
+      grid-area: right;
+      padding: 16px;
+      background: radial-gradient(circle at top, #071426 0%, #02040a 55%, #000000 100%);
+      border-left: 1px solid rgba(0, 180, 255, 0.25);
+      box-shadow: inset 12px 0 24px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    /* CHAT */
+    #chat-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(135deg, rgba(0, 40, 80, 0.9), rgba(0, 10, 20, 0.9));
+      border-radius: 14px;
+      border: 1px solid rgba(0, 180, 255, 0.35);
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    #chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      font-size: 11px;
+    }
+
+    .chat-message {
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(0, 180, 255, 0.15);
+    }
+
+    .chat-sender {
+      color: #00d9ff;
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    .chat-text {
+      color: #cfe9ff;
+      margin-top: 1px;
+      word-wrap: break-word;
+    }
+
+    #chat-input-box {
+      display: flex;
+      padding: 8px;
+      border-top: 1px solid rgba(0, 180, 255, 0.15);
+      gap: 6px;
+    }
+
+    #chat-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(0, 180, 255, 0.25);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: #cfe9ff;
+      font-size: 11px;
+    }
+
+    #chat-input::placeholder {
+      color: #555;
+    }
+
+    #chat-send {
+      padding: 6px 10px;
+      background: rgba(0, 180, 255, 0.2);
+      border: 1px solid rgba(0, 180, 255, 0.4);
+      color: #7fd0ff;
+      border-radius: 6px;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #chat-send:hover {
+      background: rgba(0, 180, 255, 0.4);
+      box-shadow: 0 0 12px rgba(0, 180, 255, 0.6);
+    }
+
+    /* BOTTOM BAR */
+    #bottom-bar {
+      grid-area: bottom;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      background: linear-gradient(90deg, #030712, #071426);
+      border-top: 1px solid rgba(0, 180, 255, 0.35);
+      box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.8);
+    }
+
+    .bottom-left, .bottom-right {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* BUTTONS */
+    .btn {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 180, 255, 0.5);
+      background: radial-gradient(circle at top, #041020, #02040a);
+      color: #cfe9ff;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      border-color: #7fd0ff;
+      box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00b4ff, #0070ff);
+      border-color: #7fd0ff;
+      box-shadow: 0 0 18px rgba(0, 180, 255, 0.8);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 0 24px rgba(0, 180, 255, 1);
+    }
+
+    .btn-danger {
+      border-color: rgba(255, 80, 80, 0.5);
+      color: #ff7777;
+    }
+
+    .btn-danger:hover {
+      border-color: #ff7777;
+      box-shadow: 0 0 12px rgba(255, 80, 80, 0.6);
+    }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 180, 255, 0.25);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 180, 255, 0.5);
+    }
+  </style>
 </head>
 
 <body>
-<div id="ui">
-  <div id="title">OLYMPUS CHESS — GOD MODE</div>
-  <div id="god-label">Current God:</div>
-  <div id="god-name">Zeus — Lord of Lightning</div>
 
-  <div class="god-row">
-    <button class="god-btn active" data-god="zeus">Zeus</button>
-    <button class="god-btn" data-god="poseidon">Poseidon</button>
-    <button class="god-btn" data-god="hades">Hades</button>
-    <button class="god-btn" data-god="athena">Athena</button>
-    <button class="god-btn" data-god="hera">Hera</button>
+<div id="app">
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <div id="topbar-title">⚡ Olympus Neon</div>
+    <div id="topbar-status">
+      <span class="status-dot"></span>
+      <span>LIVE</span>
+      <span style="margin-left: 20px; color: #7fa6ff;">Match ID: <span id="match-id" style="font-family: monospace;">loading</span></span>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn" onclick="toggleSettings()">⚙️</button>
+      <button class="btn" onclick="exitMatch()">✕</button>
+    </div>
   </div>
 
-  <button id="strike">God Effect</button>
-  <div id="status">Tap squares to move pieces. Pieces change with the god you pick.</div>
+  <!-- LEFT PANEL -->
+  <div id="left-panel">
+    <div>
+      <div class="panel-label">WHITE (Zeus)</div>
+      <div class="player-card active">
+        <div class="player-name">OlympusOP</div>
+        <div class="player-elo">1854</div>
+        <div class="player-time" id="white-time">10:00</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-label">BLACK (Hades)</div>
+      <div class="player-card">
+        <div class="player-name">ShadowNode</div>
+        <div class="player-elo">1827</div>
+        <div class="player-time" id="black-time">10:00</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-label">God Faction</div>
+      <div id="god-selector">
+        <button class="god-btn active" data-god="zeus">⚡ Zeus</button>
+        <button class="god-btn" data-god="poseidon">🌊 Poseidon</button>
+        <button class="god-btn" data-god="hades">🌑 Hades</button>
+        <button class="god-btn" data-god="hera">👑 Hera</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-label">Move History</div>
+      <div id="move-list">
+        <div style="color: #555;">No moves yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER - BOARD -->
+  <div id="center-panel">
+    <div id="center-frame"></div>
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div class="panel-label">Live Chat</div>
+    <div id="chat-box">
+      <div id="chat-messages">
+        <div class="chat-message">
+          <div class="chat-sender">SYSTEM</div>
+          <div class="chat-text">Match started. Good luck!</div>
+        </div>
+      </div>
+      <div id="chat-input-box">
+        <input id="chat-input" type="text" placeholder="Message...">
+        <button id="chat-send" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div id="bottom-bar">
+    <div class="bottom-left">
+      <button class="btn">⊕ New</button>
+      <button class="btn">↻ Rematch</button>
+      <button class="btn">⚖ Draw</button>
+    </div>
+    <div style="font-size: 12px; color: #7fa6ff;">
+      Evaluation: <span id="eval-display" style="color: #00d9ff;">+0.00</span>
+    </div>
+    <div class="bottom-right">
+      <button class="btn danger" onclick="resign()">✕ Resign</button>
+    </div>
+  </div>
 </div>
 
-<canvas id="c"></canvas>
+<script type="module">
+  import * as THREE from "https://cdn.jsdelivr.net/npm/three@r128/build/three.module.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-<!-- THREE.JS -->
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  /* ============================================================
+     FIREBASE CONFIG
+  ============================================================ */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDk6cG67wi5tRaFBMKRxfqVTzD37d00cvg",
+    authDomain: "olympus-chess-hub.firebaseapp.com",
+    projectId: "olympus-chess-hub",
+    storageBucket: "olympus-chess-hub.firebasestorage.app",
+    messagingSenderId: "554195593403",
+    appId: "1:554195593403:web:e2c7a2e202ad21d076219e",
+    measurementId: "G-WVBLXLQD50"
+  };
 
-<!-- FIREBASE (compat) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-<script>
-/* ================= FIREBASE ================= */
-const firebaseConfig = {
-  apiKey: "AIzaSyDk6cG67wi5tRaFBMKRxfqVTzD37d00cvg",
-  authDomain: "olympus-chess-hub.firebaseapp.com",
-  projectId: "olympus-chess-hub",
-  storageBucket: "olympus-chess-hub.firebasestorage.app",
-  messagingSenderId: "554195593403",
-  appId: "1:554195593403:web:e2c7a2e202ad21d076219e",
-  measurementId: "G-WVBLXLQD50"
-};
+  /* ============================================================
+     GAME STATE
+  ============================================================ */
+  const gameState = {
+    matchId: "match_" + Math.random().toString(36).slice(2, 10),
+    board: [
+      ['r','n','b','q','k','b','n','r'],
+      ['p','p','p','p','p','p','p','p'],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      ['P','P','P','P','P','P','P','P'],
+      ['R','N','B','Q','K','B','N','R']
+    ],
+    turn: 'white',
+    moveCount: 0,
+    moveHistory: [],
+    whiteTime: 600,
+    blackTime: 600,
+    evaluation: 0,
+    selectedGod: 'zeus'
+  };
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db   = firebase.firestore();
-auth.signInAnonymously().catch(console.error);
+  /* ============================================================
+     THREE.JS SETUP
+  ============================================================ */
+  const canvas = document.getElementById('game-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+  renderer.setClearColor(0x000000, 0.1);
+  renderer.shadowMap.enabled = true;
 
-/* ================= CORE STATE ================= */
-const startPos = [
-  "r","n","b","q","k","b","n","r",
-  "p","p","p","p","p","p","p","p",
-  "","","","","","","","",
-  "","","","","","","","",
-  "","","","","","","","",
-  "","","","","","","","",
-  "P","P","P","P","P","P","P","P",
-  "R","N","B","Q","K","B","N","R"
-];
-let board = [...startPos];
-let selected = null;
-let currentGod = "zeus";
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(65, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+  camera.position.set(4, 5.5, 4);
+  camera.lookAt(3.5, 0, 3.5);
 
-/* ================= THREE SETUP ================= */
-const canvas   = document.getElementById("c");
-const renderer = new THREE.WebGLRenderer({
-  canvas,
-  antialias:true,
-  powerPreference:"high-performance"
-});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
-renderer.setSize(window.innerWidth,window.innerHeight,false);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // Neon lighting
+  const ambientLight = new THREE.AmbientLight(0x00d9ff, 0.3);
+  scene.add(ambientLight);
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x05060a);
-scene.fog = new THREE.Fog(0x05060a,14,40);
+  const directionalLight = new THREE.DirectionalLight(0x00d9ff, 0.6);
+  directionalLight.position.set(5, 8, 5);
+  directionalLight.castShadow = true;
+  scene.add(directionalLight);
 
-const camera = new THREE.PerspectiveCamera(
-  55,
-  window.innerWidth/window.innerHeight,
-  0.1,
-  100
-);
-camera.position.set(6,14,14);
+  const zeusLight = new THREE.PointLight(0x00d9ff, 0.5);
+  zeusLight.position.set(-5, 3, 3);
+  scene.add(zeusLight);
 
-const controls = new THREE.OrbitControls(camera,renderer.domElement);
-controls.enableDamping = true;
-controls.target.set(3.5,0,3.5);
-controls.update();
+  const hadesLight = new THREE.PointLight(0xff00ff, 0.3);
+  hadesLight.position.set(12, 3, 12);
+  scene.add(hadesLight);
 
-/* ================= LIGHTING ================= */
-const hemi = new THREE.HemisphereLight(0xfff7e0,0x111118,0.9);
-scene.add(hemi);
+  /* ============================================================
+     BOARD RENDERING
+  ============================================================ */
+  const boardGroup = new THREE.Group();
+  scene.add(boardGroup);
 
-const keyLight = new THREE.DirectionalLight(0xfff1c2,1.4);
-keyLight.position.set(10,18,8);
-keyLight.castShadow = true;
-keyLight.shadow.mapSize.set(1024,1024);
-scene.add(keyLight);
+  const tiles = [];
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const isLight = (r + c) % 2 === 0;
+      const color = isLight ? 0x1a4d7a : 0x0a1a2e;
 
-const rimLight = new THREE.DirectionalLight(0x88aaff,0.6);
-rimLight.position.set(-8,10,-6);
-scene.add(rimLight);
-
-const godLight = new THREE.PointLight(0xffffff,0,20,2);
-godLight.position.set(3.5,8,3.5);
-scene.add(godLight);
-
-/* ================= BOARD ================= */
-const boardGroup = new THREE.Group();
-scene.add(boardGroup);
-
-const boardBase = new THREE.Mesh(
-  new THREE.BoxGeometry(9,0.5,9),
-  new THREE.MeshStandardMaterial({
-    color:0x2b2520,
-    roughness:0.5,
-    metalness:0.3
-  })
-);
-boardBase.position.set(3.5,-0.25,3.5);
-boardBase.receiveShadow = true;
-boardGroup.add(boardBase);
-
-const tiles = [];
-for(let r=0;r<8;r++){
-  for(let c=0;c<8;c++){
-    const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(1,0.12,1),
-      new THREE.MeshStandardMaterial({
-        color:(r+c)%2===0 ? 0xf7e3b0 : 0x3b2f2f,
-        roughness:0.3,
-        metalness:0.4
-      })
-    );
-    tile.position.set(c,0,r);
-    tile.receiveShadow = true;
-    tile.userData = {r,c};
-    boardGroup.add(tile);
-    tiles.push(tile);
-  }
-}
-
-/* ================= PIECES ================= */
-const meshes = new Map();
-
-function getGodMaterial(color, god){
-  switch(god){
-    case "zeus":
-      return new THREE.MeshStandardMaterial({
-        color: color === "w" ? 0xfff6d0 : 0x2b2620,
-        metalness: 0.85,
-        roughness: 0.25,
-        emissive: color === "w" ? 0xffe06c : 0x000000,
-        emissiveIntensity: color === "w" ? 0.35 : 0.08
+      const geometry = new THREE.PlaneGeometry(1, 1);
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        emissive: isLight ? 0x003d5c : 0x000000,
+        metalness: 0.4,
+        roughness: 0.6
       });
-    case "poseidon":
-      return new THREE.MeshStandardMaterial({
-        color: color === "w" ? 0xcceeff : 0x0a1a2a,
-        metalness: 0.7,
-        roughness: 0.3,
-        emissive: color === "w" ? 0x4cc7ff : 0x003344,
-        emissiveIntensity: color === "w" ? 0.45 : 0.15
-      });
-    case "hades":
-      return new THREE.MeshStandardMaterial({
-        color: color === "w" ? 0xdddddd : 0x000000,
-        metalness: 0.9,
-        roughness: 0.2,
-        emissive: color === "w" ? 0x550000 : 0x220000,
-        emissiveIntensity: color === "w" ? 0.15 : 0.45
-      });
-    case "athena":
-      return new THREE.MeshStandardMaterial({
-        color: color === "w" ? 0xffffff : 0x222222,
-        metalness: 0.95,
-        roughness: 0.15,
-        emissive: color === "w" ? 0xffd27f : 0x000000,
-        emissiveIntensity: color === "w" ? 0.25 : 0.05
-      });
-    case "hera":
-      return new THREE.MeshStandardMaterial({
-        color: color === "w" ? 0xffe6f2 : 0x2a0f1f,
-        metalness: 0.85,
-        roughness: 0.25,
-        emissive: color === "w" ? 0xcc66ff : 0x330044,
-        emissiveIntensity: color === "w" ? 0.35 : 0.2
-      });
-  }
-}
 
-function makeGodPiece(type,color,god){
-  const mat = getGodMaterial(color,god);
-  let mesh;
-  switch(type){
-    case "p": mesh = new THREE.Mesh(new THREE.SphereGeometry(0.35,32,32),mat); break;
-    case "r": mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,1.1,32),mat); break;
-    case "n": mesh = new THREE.Mesh(new THREE.TorusKnotGeometry(0.35,0.12,80,16),mat); break;
-    case "b": mesh = new THREE.Mesh(new THREE.ConeGeometry(0.38,1.4,32),mat); break;
-    case "q": mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,1.5,32),mat); break;
-    case "k": mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.7,32),mat); break;
-  }
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  mesh.userData.tx = 0;
-  mesh.userData.tz = 0;
-  mesh.userData.hidden = false;
-  scene.add(mesh);
-  return mesh;
-}
+      const tile = new THREE.Mesh(geometry, material);
+      tile.receiveShadow = true;
+      tile.rotation.x = -Math.PI / 2;
+      tile.position.set(c, 0, r);
 
-function indexToSquare(i){
-  const row = Math.floor(i/8);
-  const col = i%8;
-  const file = String.fromCharCode(97+col);
-  const rank = 8-row;
-  return file+rank;
-}
-function squareToXZ(square){
-  const file = square.charCodeAt(0)-97;
-  const rank = parseInt(square[1],10);
-  const x = file;
-  const z = 8-rank;
-  return {x,z};
-}
-
-function initPieces(){
-  // clear old
-  for(const m of meshes.values()) scene.remove(m);
-  meshes.clear();
-
-  for(let i=0;i<64;i++){
-    if(!board[i]) continue;
-    const pieceChar = board[i];
-    const type = pieceChar.toLowerCase();
-    const color = pieceChar === pieceChar.toUpperCase() ? "w" : "b";
-    const mesh = makeGodPiece(type,color,currentGod);
-    const sq = indexToSquare(i);
-    const {x,z} = squareToXZ(sq);
-    mesh.position.set(x,0.35,z);
-    mesh.userData.tx = x;
-    mesh.userData.tz = z;
-    meshes.set(i,mesh);
-  }
-}
-initPieces();
-
-/* ================= ANIMATION ================= */
-function updateTweens(){
-  for(const mesh of meshes.values()){
-    if(mesh.userData.hidden){
-      mesh.position.y += (-5 - mesh.position.y)*0.2;
-      continue;
+      boardGroup.add(tile);
+      tiles.push(tile);
     }
-    mesh.position.x += (mesh.userData.tx - mesh.position.x)*0.18;
-    mesh.position.z += (mesh.userData.tz - mesh.position.z)*0.18;
-    mesh.position.y += (0.35 - mesh.position.y)*0.18;
   }
-}
 
-/* ================= INPUT ================= */
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+  /* ============================================================
+     PIECE SYSTEM
+  ============================================================ */
+  const pieces = {};
 
-window.addEventListener("click",(e)=>{
-  mouse.x = (e.clientX/window.innerWidth)*2-1;
-  mouse.y = -(e.clientY/window.innerHeight)*2+1;
-  raycaster.setFromCamera(mouse,camera);
-  const hit = raycaster.intersectObjects(tiles)[0];
-  if(!hit) return;
-  const {r,c} = hit.object.userData;
-  const i = r*8 + c;
-  handleClick(i);
-});
+  function createPiece(notation, row, col) {
+    const isWhite = notation === notation.toUpperCase();
+    const color = isWhite ? 0x00d9ff : 0xff00ff;
+    const emissive = isWhite ? 0x00ffff : 0xff0088;
 
-function handleClick(i){
-  if(selected === null){
-    if(board[i]){
-      selected = i;
-      document.getElementById("status").textContent = "Selected " + indexToSquare(i);
+    const geometry = new THREE.IcosahedronGeometry(0.35, 4);
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      emissive,
+      metalness: 0.7,
+      roughness: 0.2
+    });
+
+    const piece = new THREE.Mesh(geometry, material);
+    piece.castShadow = true;
+    piece.receiveShadow = true;
+    piece.position.set(col + 0.5, 0.5, row + 0.5);
+    piece.userData = { notation, row, col, isWhite };
+
+    boardGroup.add(piece);
+    pieces[`${row}-${col}`] = piece;
+  }
+
+  // Initialize pieces
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const notation = gameState.board[r][c];
+      if (notation !== ' ') {
+        createPiece(notation, r, c);
+      }
     }
-  } else {
-    movePiece(selected,i);
-    selected = null;
-  }
-}
-
-/* ================= MOVE LOGIC (simple) ================= */
-function movePiece(from,to){
-  if(from === to) return;
-  if(!board[from]) return;
-
-  board[to] = board[from];
-  board[from] = "";
-
-  const meshFrom = meshes.get(from);
-  if(meshFrom){
-    const sqTo = indexToSquare(to);
-    const {x,z} = squareToXZ(sqTo);
-    meshFrom.userData.tx = x;
-    meshFrom.userData.tz = z;
-    meshes.set(to,meshFrom);
-    meshes.delete(from);
   }
 
-  const meshCap = meshes.get(to);
-  if(meshCap && meshCap !== meshFrom){
-    meshCap.userData.hidden = true;
-  }
+  /* ============================================================
+     PARTICLE SYSTEM
+  ============================================================ */
+  const particles = [];
 
-  document.getElementById("status").textContent = "Moved to " + indexToSquare(to);
-}
+  function createParticles(pos, isWhite) {
+    const particleCount = 15;
+    const color = isWhite ? 0x00d9ff : 0xff00ff;
 
-/* ================= GOD EFFECT ================= */
-function godEffect(){
-  let color;
-  switch(currentGod){
-    case "zeus": color = 0xfff6a0; break;
-    case "poseidon": color = 0x4cc7ff; break;
-    case "hades": color = 0xff3333; break;
-    case "athena": color = 0xffd27f; break;
-    case "hera": color = 0xcc66ff; break;
-  }
-  godLight.color.setHex(color);
-  godLight.intensity = 0;
-  let t = 0;
-  const interval = setInterval(()=>{
-    t += 1;
-    godLight.intensity = (t%2===0) ? 0 : 20;
-    if(t>6){
-      godLight.intensity = 0;
-      clearInterval(interval);
+    for (let i = 0; i < particleCount; i++) {
+      const geometry = new THREE.SphereGeometry(0.05, 4, 4);
+      const material = new THREE.MeshBasicMaterial({ color });
+      const particle = new THREE.Mesh(geometry, material);
+
+      particle.position.copy(pos);
+      particle.velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * 3,
+        Math.random() * 2,
+        (Math.random() - 0.5) * 3
+      );
+      particle.life = 1;
+      particle.maxLife = 1;
+
+      boardGroup.add(particle);
+      particles.push(particle);
     }
-  },80);
-}
-document.getElementById("strike").onclick = godEffect;
+  }
 
-/* ================= GOD SELECTION UI ================= */
-const godButtons = document.querySelectorAll(".god-btn");
-const godNameEl = document.getElementById("god-name");
+  /* ============================================================
+     GAME LOGIC
+  ============================================================ */
+  function makeMove(fromRow, fromCol, toRow, toCol) {
+    const notation = gameState.board[fromRow][fromCol];
+    if (notation === ' ') return;
 
-function setGod(g){
-  currentGod = g;
-  godButtons.forEach(b=>b.classList.toggle("active", b.dataset.god===g));
-  let label = "";
-  if(g==="zeus") label = "Zeus — Lord of Lightning";
-  if(g==="poseidon") label = "Poseidon — Lord of the Seas";
-  if(g==="hades") label = "Hades — Lord of Shadows";
-  if(g==="athena") label = "Athena — Goddess of Wisdom";
-  if(g==="hera") label = "Hera — Queen of the Gods";
-  godNameEl.textContent = label;
-  document.getElementById("status").textContent = "God set to " + g + ". Pieces re‑themed.";
-  initPieces();
-}
+    // Capture
+    if (gameState.board[toRow][toCol] !== ' ') {
+      const captured = pieces[`${toRow}-${toCol}`];
+      if (captured) {
+        createParticles(captured.position, gameState.turn === 'white');
+        boardGroup.remove(captured);
+        delete pieces[`${toRow}-${toCol}`];
+      }
+    }
 
-godButtons.forEach(btn=>{
-  btn.addEventListener("click",()=>setGod(btn.dataset.god));
-});
+    // Move
+    gameState.board[toRow][toCol] = notation;
+    gameState.board[fromRow][fromCol] = ' ';
 
-/* ================= LOOP ================= */
-function animate(){
-  requestAnimationFrame(animate);
-  updateTweens();
-  controls.update();
-  renderer.render(scene,camera);
-}
-animate();
+    const piece = pieces[`${fromRow}-${fromCol}`];
+    if (piece) {
+      piece.position.set(toCol + 0.5, 0.5, toRow + 0.5);
+      piece.userData.row = toRow;
+      piece.userData.col = toCol;
+      delete pieces[`${fromRow}-${fromCol}`];
+      pieces[`${toRow}-${toCol}`] = piece;
+    }
 
-window.addEventListener("resize",()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight,false);
-});
+    gameState.moveCount++;
+    gameState.moveHistory.push(`${String.fromCharCode(97 + fromCol)}${8 - fromRow}${String.fromCharCode(97 + toCol)}${8 - toRow}`);
+    gameState.turn = gameState.turn === 'white' ? 'black' : 'white';
+    gameState.evaluation += (Math.random() - 0.5) * 20;
+
+    updateUI();
+    syncToFirebase();
+  }
+
+  /* ============================================================
+     UI UPDATES
+  ============================================================ */
+  function updateUI() {
+    document.getElementById('match-id').textContent = gameState.matchId.slice(0, 8).toUpperCase();
+    document.getElementById('eval-display').textContent = (gameState.evaluation / 100).toFixed(2);
+    document.getElementById('white-time').textContent = formatTime(gameState.whiteTime);
+    document.getElementById('black-time').textContent = formatTime(gameState.blackTime);
+
+    const moveList = document.getElementById('move-list');
+    if (gameState.moveHistory.length > 0) {
+      moveList.innerHTML = gameState.moveHistory
+        .map((move, idx) => `<div class="move-row"><span class="move-index">${idx + 1}.</span><span>${move}</span></div>`)
+        .join('');
+      moveList.scrollTop = moveList.scrollHeight;
+    }
+  }
+
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  /* ============================================================
+     FIREBASE SYNC
+  ============================================================ */
+  async function syncToFirebase() {
+    try {
+      await setDoc(doc(db, 'matches', gameState.matchId), {
+        board: gameState.board,
+        turn: gameState.turn,
+        moveCount: gameState.moveCount,
+        moveHistory: gameState.moveHistory,
+        evaluation: gameState.evaluation,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Firebase sync error:', err);
+    }
+  }
+
+  function listenToMatch() {
+    onSnapshot(doc(db, 'matches', gameState.matchId), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.board) gameState.board = data.board;
+      if (data.turn) gameState.turn = data.turn;
+      if (data.evaluation !== undefined) gameState.evaluation = data.evaluation;
+    });
+  }
+
+  /* ============================================================
+     ANIMATION LOOP
+  ============================================================ */
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // Update clocks
+    if (gameState.turn === 'white') {
+      gameState.whiteTime -= 0.016;
+    } else {
+      gameState.blackTime -= 0.016;
+    }
+
+    // Update particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.velocity.y -= 0.05;
+      p.position.add(p.velocity.clone().multiplyScalar(0.016));
+      p.life -= 0.016 / p.maxLife;
+
+      if (p.life <= 0) {
+        boardGroup.remove(p);
+        particles.splice(i, 1);
+      } else {
+        p.material.opacity = p.life;
+      }
+    }
+
+    // Subtle camera orbit
+    const time = Date.now() * 0.0001;
+    camera.position.x = 4 + Math.sin(time) * 0.2;
+    camera.position.z = 4 + Math.cos(time) * 0.2;
+    camera.lookAt(3.5, 0, 3.5);
+
+    // Pulsing lights
+    zeusLight.intensity = 0.5 + Math.sin(time * 2) * 0.1;
+    hadesLight.intensity = 0.3 + Math.cos(time * 2.5) * 0.1;
+
+    renderer.render(scene, camera);
+    updateUI();
+  }
+
+  animate();
+
+  /* ============================================================
+     EVENT HANDLERS
+  ============================================================ */
+  window.addEventListener('resize', () => {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+
+  // God faction selector
+  document.querySelectorAll('.god-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.god-btn').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      gameState.selectedGod = e.target.dataset.god;
+    });
+  });
+
+  // Demo moves on canvas click
+  canvas.addEventListener('click', () => {
+    if (Math.random() < 0.5) {
+      makeMove(6, 4, 4, 4);
+    } else {
+      makeMove(1, 0, 3, 0);
+    }
+  });
+
+  /* ============================================================
+     GLOBAL FUNCTIONS
+  ============================================================ */
+  window.sendChat = () => {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    const messagesDiv = document.getElementById('chat-messages');
+    const msgEl = document.createElement('div');
+    msgEl.className = 'chat-message';
+    msgEl.innerHTML = `
+      <div class="chat-sender">You</div>
+      <div class="chat-text">${msg}</div>
+    `;
+    messagesDiv.appendChild(msgEl);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    input.value = '';
+  };
+
+  window.resign = () => {
+    if (confirm('Resign the match?')) {
+      alert('You resigned.');
+    }
+  };
+
+  window.toggleSettings = () => {
+    alert('Settings menu');
+  };
+
+  window.exitMatch = () => {
+    if (confirm('Exit match?')) {
+      window.location.reload();
+    }
+  };
+
+  // Initialize
+  document.getElementById('match-id').textContent = gameState.matchId.slice(0, 8).toUpperCase();
+  listenToMatch();
+  syncToFirebase();
+
 </script>
+
 </body>
 </html>
