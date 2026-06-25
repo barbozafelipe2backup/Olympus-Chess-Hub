@@ -2,32 +2,32 @@
 <html>
 <head>
     <title>Olympus Chess 3D</title>
-    <style>body { margin: 0; overflow: hidden; background: #050505; }</style>
+    <style>body { margin: 0; overflow: hidden; background: #000; }</style>
 </head>
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Setup Scene
+        const socket = io();
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Board
-        const geometry = new THREE.BoxGeometry(8, 0.5, 8);
-        const material = new THREE.MeshPhongMaterial({ color: 0x222222 });
-        const board = new THREE.Mesh(geometry, material);
+        // Basic Board Rendering
+        const board = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 8), new THREE.MeshPhongMaterial({ color: 0x222222 }));
         scene.add(board);
-
-        // Lighting
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 5, 5);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x404040));
-
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        
         camera.position.set(0, 8, 10);
         camera.lookAt(0, 0, 0);
+
+        // Handle Moves from Server
+        socket.on('move', (data) => {
+            console.log("Opponent moved:", data);
+            // Logic to move 3D mesh objects on board
+        });
 
         function animate() {
             requestAnimationFrame(animate);
